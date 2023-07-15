@@ -8,7 +8,7 @@ import { NS } from "@ns";
  * @param {boolean} lookRecursive - If set to true, it will find servers recursively
  * @returns {string[]} - List of servers
  */
-export async function findServers(
+export async function scanForServers(
   ns: NS,
   target: string,
   filter?: string,
@@ -24,7 +24,7 @@ export async function findServers(
   // Scans found servers for subservers recursively 
   if (lookRecursive === true && servers.size > 1) {
     for (let server of servers) {
-      const subServers = await findServers(ns, server, "home", lookRecursive);
+      const subServers = await scanForServers(ns, server, "home", lookRecursive);
       servers = new Set([...servers, ...subServers]);
     }
   }
