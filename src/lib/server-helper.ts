@@ -16,7 +16,7 @@ export async function findServers(
 ) {
 
   // Scans network for provided target
-  let servers = new Set<string>(ns.scan(target));
+  let servers: Set<string> = new Set<string>(ns.scan(target));
   if (filter != undefined) {
     servers = await filterServers(ns, servers, filter);
   }
@@ -30,6 +30,23 @@ export async function findServers(
   }
 
   return servers;
+}
+
+/**
+ * Filters a list of servers
+ * @param ns - Netscript library
+ * @param servers - Servers to be filtered
+ * @param filter - String that filters servers
+ * @returns - List of filtered servers
+ */
+export function filterServers(ns: NS, servers: Set<string>, filter: string) {
+  const filteredServers = new Set<string>();
+  for (let server of servers) {
+    if (!server.includes(filter)) {
+      filteredServers.add(server);
+    }
+  }
+  return filteredServers;
 }
 
 
