@@ -3,7 +3,7 @@ import { NS, Server} from "@ns";
 /** @param {NS} ns */
 export async function main(ns: NS, src: string) {
 	let nodes: string[] = await ns.scan(src);
-    await ns.print(`Found nodes: ${nodes}`);
+    ns.print(`Found nodes: ${nodes}`);
 
     for (let node of nodes) {
         const server: Server = ns.getServer(node)
@@ -21,7 +21,7 @@ export async function main(ns: NS, src: string) {
 
             await init(ns, target);
 
-            await ns.print(`Hacking server ${target} ${threadAmount} times...`);
+            ns.print(`Hacking server ${target} ${threadAmount} times...`);
             ns.exec("hack.js", target, threadAmount, target);
         }
     }
