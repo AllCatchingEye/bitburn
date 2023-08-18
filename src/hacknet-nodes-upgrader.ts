@@ -19,6 +19,8 @@ enum UpgradeType {
 
 /** @param {NS} ns */
 export async function main(ns: NS) {
+  ns.disableLog("sleep");
+
   while (true) {
     const cheapestNode: Node = getCheapestNode(ns);
   
