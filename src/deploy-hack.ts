@@ -31,12 +31,16 @@ export async function main(ns: NS, src: string) {
 export async function init(ns:NS, target: string) {
     await ns.scp("hack.js", target);
     
-    if (ns.fileExists("BruteSSH.exe", target)) {
-        await ns.brutessh(target);
+    const sshPortsOpen: boolean = ns.getServer(target).sshPortOpen;
+    const ftpPortsOpen: boolean = ns.getServer(target).ftpPortOpen;
+
+    if (ns.fileExists("BruteSSH.exe", "home") && !sshPortsOpen) {
+        ns.brutessh(target);
     }
-    if (ns.fileExists("FTPCrack.exe", target)) {
-        await ns.ftpcrack(target);
+
+    if (ns.fileExists("FTPCrack.exe", "home") && !ftpPortsOpen) {
+        ns.ftpcrack(target);
     }
+
     ns.nuke(target);
-    
 }
