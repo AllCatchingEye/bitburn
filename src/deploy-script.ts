@@ -1,11 +1,12 @@
 import { NS, Server} from "@ns";
+import { findServers } from "./lib/find-servers";
 
 /** @param {NS} ns */
 export async function main(ns: NS) {
   const src = ns.args[0].toString();
   const target = ns.args[1].toString();
 
-	let foundServers: string[] = await ns.scan(src);
+	let foundServers: string[] = await findServers(ns, src);
   await deployScripts(foundServers, ns, target);
 }
 
@@ -61,19 +62,4 @@ function initilizeServer(ns: NS, target: string) {
 function executeScriptOnTarget(ns: NS, server: Server, threadAmount: number, target: string) {
   ns.print(`Hacking server ${server.hostname} ${threadAmount} times...`);
   ns.exec("hack.js", server.hostname, threadAmount, target);
-}
-
-function findServers(ns: NS, src: string, found: string[] | undefined = undefined): string[] {
-  let target = src;
-  let foundServers = ns.scan(target);
-
-  for (let server of foundServers) {
-    if (server in foundServers) {
-      continue;
-    }
-
-    foundServers.concat(ns.scan(server));
-  }
-
-  return foundServers;
 }
