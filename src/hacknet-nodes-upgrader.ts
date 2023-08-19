@@ -25,7 +25,7 @@ export async function main(ns: NS) {
     const cheapestNode: Node = getCheapestNode(ns);
   
     upgradeHacknet(ns, cheapestNode);
-    await ns.sleep(100);
+    await ns.sleep(1000);
   }
 }
 
