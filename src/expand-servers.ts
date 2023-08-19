@@ -11,7 +11,12 @@ export async function main(ns: NS) {
 
 async function purchaseAllServers(ns: NS, ram: number) {
     for (let i = 0; i < ns.getPurchasedServerLimit(); i++) {
+        
         const purchasedServerName = SERVER_BASE_NAME + i;
+        if(ns.serverExists(purchasedServerName)) {
+            continue;
+        }
+
         if (canPurchaseServer(ns, ram)) {
             ns.purchaseServer(purchasedServerName, ram);
         }
@@ -21,7 +26,7 @@ async function purchaseAllServers(ns: NS, ram: number) {
 }
 
 async function upgradeAllServers(ns: NS, ram: number) {
-    for (let exponent = 2; exponent < 20; exponent++) {
+    for (let exponent = 1; exponent < 20; exponent++) {
         const ramUpgradeSize = Math.pow(ram, exponent);
         await upgradeServer(ns, ramUpgradeSize);
 
