@@ -84,13 +84,24 @@ function getMaxPossibleThreads(ns: NS, server: Server) {
 function initializeTargetServer(ns: NS, targetServerName: string) {
   ns.print(`Initilizing server ${targetServerName} for scripts...`);
 
+  if (ns.fileExists("BruteSSH.exe")) {
+    ns.brutessh(targetServerName);
+  }
 
-  const programs = ["BruteSSH.exe", "FTPCrack.exe", "relaySTMP.exe", "HTTPWorm.exe", "SQLInject.exe"];
+  if(ns.fileExists("FTPCrack.exe")) {
+    ns.ftpcrack(targetServerName);
+  }
 
-  for (const program of programs) {
-    if (ns.fileExists(program)) {
-      ns.exec(program, targetServerName);
-    }
+  if(ns.fileExists("relaySTMP.exe")) {
+    ns.relaysmtp(targetServerName);
+  }
+
+  if(ns.fileExists("HTTPWorm.exe")) {
+    ns.httpworm(targetServerName);
+  }
+
+  if(ns.fileExists("SQLInject.exe")) {
+    ns.sqlinject(targetServerName);
   }
 
   ns.nuke(targetServerName);
