@@ -13,7 +13,7 @@ export async function main(ns: NS) {
 }
 
 async function deployScripts(serverNames: string[], ns: NS, target: string) {
-  ns.tprint(serverNames);
+  ns.print(serverNames);
   for (let serverName of serverNames) {
     await deployScript(ns, serverName, target);
   }
@@ -39,7 +39,7 @@ async function deployScript(ns: NS, serverName: string, target: string) {
 function canDeployScript(ns: NS, server: Server, threadAmount: number) {
   return canHackServer(ns, server)
   && canInitilizeServer(ns, server)
-  && hasEnoughRam(ns, server, threadAmount);;
+  && hasEnoughRam(threadAmount);;
 }
 
 function canHackServer(ns: NS, server: Server) {
@@ -48,7 +48,7 @@ function canHackServer(ns: NS, server: Server) {
   return hackLevel >= hackLevelRequired;
 }
 
-function hasEnoughRam(ns: NS, server: Server, threadAmount: number) {
+function hasEnoughRam(threadAmount: number) {
   return threadAmount > 0;
 }
 
