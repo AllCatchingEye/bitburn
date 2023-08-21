@@ -13,6 +13,7 @@ export async function main(ns: NS) {
 }
 
 async function deployScripts(serverNames: string[], ns: NS, target: string) {
+  ns.tprint(serverNames);
   for (let serverName of serverNames) {
     await deployScript(ns, serverName, target);
   }
@@ -53,7 +54,7 @@ function hasEnoughRam(ns: NS, server: Server, threadAmount: number) {
 
 function canInitilizeServer(ns: NS, target: Server) {
   const openPortsRequired = target.numOpenPortsRequired;
-  if (openPortsRequired === undefined) {
+  if (openPortsRequired === undefined || target.hasAdminRights) {
     return true;
   }
 
@@ -64,6 +65,7 @@ function canInitilizeServer(ns: NS, target: Server) {
   openablePorts += Number(ns.fileExists("HTTPWorm.exe"));
   openablePorts += Number(ns.fileExists("SQLInject.exe"));
 
+  debugger;
   return openablePorts >= openPortsRequired;
 }
 
