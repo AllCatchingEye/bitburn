@@ -12,14 +12,22 @@ export async function main(ns: NS) {
   await deployScripts(targetServers, ns, targetServerName);
 }
 
-async function deployScripts(serverNames: string[], ns: NS, targetServerName: string) {
+async function deployScripts(
+  serverNames: string[],
+  ns: NS,
+  targetServerName: string
+) {
   ns.print(serverNames);
   for (let serverName of serverNames) {
     await deployScriptOnServer(ns, serverName, targetServerName);
   }
 }
 
-async function deployScriptOnServer(ns: NS, serverName: string, targetServerName: string) {
+async function deployScriptOnServer(
+  ns: NS,
+  serverName: string,
+  targetServerName: string
+) {
   const server: Server = ns.getServer(serverName);
   const threadAmount = getMaxPossibleThreads(ns, server);
 
@@ -63,8 +71,14 @@ function canInitializeTargetServer(ns: NS, targetServerName: Server) {
   }
 
   let openableProgramsCount = 0;
-  const programs = ["BruteSSH.exe", "FTPCrack.exe", "relaySTMP.exe", "HTTPWorm.exe", "SQLInject.exe"];
-  
+  const programs = [
+    "BruteSSH.exe",
+    "FTPCrack.exe",
+    "relaySTMP.exe",
+    "HTTPWorm.exe",
+    "SQLInject.exe",
+  ];
+
   for (const program of programs) {
     openableProgramsCount += Number(ns.fileExists(program));
   }
@@ -88,19 +102,19 @@ function initializeTargetServer(ns: NS, targetServerName: string) {
     ns.brutessh(targetServerName);
   }
 
-  if(ns.fileExists("FTPCrack.exe")) {
+  if (ns.fileExists("FTPCrack.exe")) {
     ns.ftpcrack(targetServerName);
   }
 
-  if(ns.fileExists("relaySTMP.exe")) {
+  if (ns.fileExists("relaySTMP.exe")) {
     ns.relaysmtp(targetServerName);
   }
 
-  if(ns.fileExists("HTTPWorm.exe")) {
+  if (ns.fileExists("HTTPWorm.exe")) {
     ns.httpworm(targetServerName);
   }
 
-  if(ns.fileExists("SQLInject.exe")) {
+  if (ns.fileExists("SQLInject.exe")) {
     ns.sqlinject(targetServerName);
   }
 
@@ -113,6 +127,16 @@ function executeScriptOnServer(
   threadAmount: number,
   target: string
 ) {
+  const moneyThresh = ns.getServerMaxMoney(target) * 0.75;
+  const securityThresh = ns.getServerMinSecurityLevel(target) + 5;
+
   ns.print(`Hacking server ${server.hostname} ${threadAmount} times...`);
-  ns.exec("hack.js", server.hostname, threadAmount, target);
+  ns.exec(
+    "hack.js",
+    server.hostname,
+    threadAmount,
+    target,
+    moneyThresh,
+    securityThresh
+  );
 }
