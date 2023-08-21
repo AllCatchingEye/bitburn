@@ -5,68 +5,72 @@ import { findServers } from "./lib/find-servers";
 export async function main(ns: NS) {
   ns.disableLog("sleep");
 
-  const src = ns.args[0].toString();
-  const target = ns.args[1].toString();
+  const sourceServerName = ns.args[0].toString();
+  const targetServerName = ns.args[1].toString();
 
-  let foundServers: string[] = await findServers(ns, src);
-  await deployScripts(foundServers, ns, target);
+  let targetServers: string[] = await findServers(ns, sourceServerName);
+  await deployScripts(targetServers, ns, targetServerName);
 }
 
-async function deployScripts(serverNames: string[], ns: NS, target: string) {
+async function deployScripts(serverNames: string[], ns: NS, targetServerName: string) {
   ns.print(serverNames);
   for (let serverName of serverNames) {
-    await deployScript(ns, serverName, target);
+    await deployScriptOnServer(ns, serverName, targetServerName);
   }
 }
 
-async function deployScript(ns: NS, serverName: string, target: string) {
+async function deployScriptOnServer(ns: NS, serverName: string, targetServerName: string) {
   const server: Server = ns.getServer(serverName);
   const threadAmount = getMaxPossibleThreads(ns, server);
+
   ns.print(`Trying to deploy script on server ${server.hostname}.`);
-  if (canDeployScript(ns, server, threadAmount)) {
+
+  if (canDeployToServer(ns, server, threadAmount)) {
     ns.print(`Copying script to ${server.hostname}.`);
     await ns.scp("hack.js", server.hostname);
 
-    initilizeServer(ns, server.hostname);
+    initializeTargetServer(ns, server.hostname);
 
     ns.print(`Executing script on server ${server.hostname}`);
-    executeScriptOnTarget(ns, server, threadAmount, target);
+    executeScriptOnServer(ns, server, threadAmount, targetServerName);
   } else {
-    ns.print(`Coudn't deploy script on server ${target}.`);
+    ns.print(`Coudn't deploy script on server ${targetServerName}.`);
   }
 }
 
-function canDeployScript(ns: NS, server: Server, threadAmount: number) {
-  return canHackServer(ns, server)
-  && canInitilizeServer(ns, server)
-  && hasEnoughRam(threadAmount);;
+function canDeployToServer(ns: NS, server: Server, threadAmount: number) {
+  return (
+    canHackTargetServer(ns, server) &&
+    canInitializeTargetServer(ns, server) &&
+    hasSufficientThreads(threadAmount)
+  );
 }
 
-function canHackServer(ns: NS, server: Server) {
+function canHackTargetServer(ns: NS, server: Server) {
   const hackLevelRequired = ns.getServerRequiredHackingLevel(server.hostname);
   const hackLevel = ns.getHackingLevel();
   return hackLevel >= hackLevelRequired;
 }
 
-function hasEnoughRam(threadAmount: number) {
+function hasSufficientThreads(threadAmount: number) {
   return threadAmount > 0;
 }
 
-function canInitilizeServer(ns: NS, target: Server) {
-  const openPortsRequired = target.numOpenPortsRequired;
-  if (openPortsRequired === undefined || target.hasAdminRights) {
+function canInitializeTargetServer(ns: NS, targetServerName: Server) {
+  const openPortsRequired = targetServerName.numOpenPortsRequired;
+  if (openPortsRequired === undefined || targetServerName.hasAdminRights) {
     return true;
   }
 
-  let openablePorts = 0;
-  openablePorts += Number(ns.fileExists("BruteSSH.exe"));
-  openablePorts += Number(ns.fileExists("FTPCrack.exe"));
-  openablePorts += Number(ns.fileExists("relaySTMP.exe"));
-  openablePorts += Number(ns.fileExists("HTTPWorm.exe"));
-  openablePorts += Number(ns.fileExists("SQLInject.exe"));
+  let openableProgramsCount = 0;
+  const programs = ["BruteSSH.exe", "FTPCrack.exe", "relaySTMP.exe", "HTTPWorm.exe", "SQLInject.exe"];
+  
+  for (const program of programs) {
+    openableProgramsCount += Number(ns.fileExists(program));
+  }
 
   debugger;
-  return openablePorts >= openPortsRequired;
+  return openableProgramsCount >= openPortsRequired;
 }
 
 function getMaxPossibleThreads(ns: NS, server: Server) {
@@ -77,33 +81,22 @@ function getMaxPossibleThreads(ns: NS, server: Server) {
   return threadAmount;
 }
 
-function initilizeServer(ns: NS, target: string) {
-  ns.print(`Initilizing server ${target} for scripts...`);
-  
-  if (ns.fileExists("BruteSSH.exe")) {
-    ns.brutessh(target);
+function initializeTargetServer(ns: NS, targetServerName: string) {
+  ns.print(`Initilizing server ${targetServerName} for scripts...`);
+
+
+  const programs = ["BruteSSH.exe", "FTPCrack.exe", "relaySTMP.exe", "HTTPWorm.exe", "SQLInject.exe"];
+
+  for (const program of programs) {
+    if (ns.fileExists(program)) {
+      ns.exec(program, targetServerName);
+    }
   }
 
-  if(ns.fileExists("FTPCrack.exe")) {
-    ns.ftpcrack(target);
-  }
-
-  if(ns.fileExists("relaySTMP.exe")) {
-    ns.relaysmtp(target);
-  }
-
-  if(ns.fileExists("HTTPWorm.exe")) {
-    ns.httpworm(target);
-  }
-
-  if(ns.fileExists("SQLInject.exe")) {
-    ns.sqlinject(target);
-  }
-
-  ns.nuke(target);
+  ns.nuke(targetServerName);
 }
 
-function executeScriptOnTarget(
+function executeScriptOnServer(
   ns: NS,
   server: Server,
   threadAmount: number,
