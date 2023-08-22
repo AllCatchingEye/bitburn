@@ -1,5 +1,6 @@
 import { NS } from "../../NetscriptDefinitions";
 
-export async function main(ns: NS, target: string) {
-    ns.weaken(target);
+export async function main(ns: NS): Promise<void> {
+    const target = ns.args[0] as string;
+    await ns.weaken(target);
 }
