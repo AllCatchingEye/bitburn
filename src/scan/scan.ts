@@ -5,6 +5,7 @@ export async function main(ns: NS) {
     //const foundServers = searchServers(ns, root);
 
     const foundServers = searchServers(ns, "home");
+    ns.tprint(`Found ${foundServers.length} servers:`);
     ns.tprint(foundServers);
 }
 
@@ -21,7 +22,12 @@ function searchForServers(ns: NS, root: string, serverFilter: Set<string>): stri
     const newServers = filterFoundServers(ns, foundServers, serverFilter);
     const newServerFilter = addNewServersToFilter(newServers, serverFilter);
 
-    const serverSearchResult = newServers.flatMap(newServer => searchForServers(ns, newServer, newServerFilter))
+    const serverSearchResult: string[] = [...newServers];
+    for (const newServer of newServers) {
+        const newServerSearchResults = searchForServers(ns, newServer, newServerFilter);
+        serverSearchResult.push(...newServerSearchResults);
+    }
+
     return serverSearchResult;
 }
 
