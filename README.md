@@ -1,72 +1,68 @@
-# Typescript template for Bitburner's Remote File API
+## Extension Recommendations
+[vscode-bitburner-connector](https://github.com/bitburner-official/bitburner-vscode) ([vscode extension marketplace](https://marketplace.visualstudio.com/items?itemName=bitburner.bitburner-vscode-integration)) to upload your files into the game
 
-The official template for synchronizing Typescript/Javascript from your computer to the game.
+[vscode-eslint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) to use live linting in editor
 
-[Step by step install](BeginnersGuide.md)
+[auto-snippet](https://marketplace.visualstudio.com/items?itemName=Gruntfuggly.auto-snippet) to automate inserting the file template in `.vscode/snippets.code-snippets`
 
-[Learn more about Typescript](https://www.typescriptlang.org/docs/)
+There is a workspace file in `.vscode` which contains the recommended settings for all of these
 
-## About
+## Dependencies
+[Node.js](https://nodejs.org/en/download/) required for compiling typescript and installing dependencies
 
-This template uses the Typescript compiler and the Remote File API system to synchronize Typescript to your game.
-Due to the usage of the RFA system, it works with Web and Electron versions of the game.
-
-## Prerequisites
-
-[Node.js](https://nodejs.org/en/download/) is needed for compiling typescript and installing dependencies
-
-[See here for step by step installation](BeginnersGuide.md) if you'd like help with installing Node and/or connecting to the game.
-
-## Quick start
-
-Download the template to your computer and install everything it requires:
+## Installation
 ```
-git clone https://github.com/bitburner-official/typescript-template
-cd typescript-template
-npm i
+git clone https://github.com/bitburner-official/vscode-template
+npm install
+npm run defs
 ```
 
-### How to use this template
-
+## How to use this template
 Write all your typescript source code in the `/src` directory
 
-To autocompile and send changed files as you save, run `npm run watch` in a terminal.
-Have it running in the background so that it all happens automatically.
+To autocompile as you save, run `npm run watch` in a terminal
 
-For Bitburner to receive any files, you need to enter the port `npm run watch` logs to the terminal
-in the Remote API section of the game settings, and press the connect button.
+To update your Netscript Definitions, run `npm run defs` in a terminal
 
-[See here for step by step installation](BeginnersGuide.md) if you'd like help with installing Node and/or connecting to the game.
+Press F1 and Select `Bitburner: Enable File Watcher` to enable auto uploading to the game
 
-## Advanced
-### Imports
+If you run `watcher.js` in game, the game will automatically detect file changes and restart the associated scripts
 
+## Imports
 To ensure both the game and typescript have no issues with import paths, your import statements should follow a few formatting rules:
 
-- Paths must be absolute from the root of `src/`, which will be equivalent to the root directory of your home drive
-- Paths must contain no leading slash
-- Paths must end with no file extension
+ * Paths must be absolute from the root of `src/`, which will be equivalent to the root directory of your home drive
+ * Paths must contain no leading slash
+ * Paths must end with no file extension
 
-#### Examples:
+ ### Examples:
 
-To import `helperFunction` from the file `helpers.ts` located in the directory `src/lib/`:
+To import `helperFunction` from the file `helpers.ts` located in the directory `src/lib/`: 
 
 ```js
-import { helperFunction } from "lib/helpers";
+import { helperFunction } from 'lib/helpers'
 ```
 
 To import all functions from the file `helpers.ts` located in the `src/lib/` directory as the namespace `helpers`:
 
 ```js
-import * as helpers from "lib/helpers";
+import * as helpers from 'lib/helpers'
 ```
 
 To import `someFunction` from the file `main.ts` located in the `src/` directory:
 
 ```js
-import { someFunction } from "main";
+import { someFunction } from 'main'
 ```
 
-### Debugging
+## Deugging
 
 For debugging bitburner on Steam you will need to enable a remote debugging port. This can be done by rightclicking bitburner in your Steam library and selecting properties. There you need to add `--remote-debugging-port=9222` [Thanks @DarkMio]
+
+When debugging you see errors like the following:
+
+```
+Could not read source map for file:///path/to/Steam/steamapps/common/Bitburner/resources/app/dist/ext/monaco-editor/min/vs/editor/editor.main.js: ENOENT: no such file or directory, open '/path/to/Steam/steamapps/common/Bitburner/resources/app/dist/ext/monaco-editor/min/vs/editor/editor.main.js.map'
+```
+
+These errors are to be expected, they are referring to the game's files and the game does not come packaged with sourcemaps.
