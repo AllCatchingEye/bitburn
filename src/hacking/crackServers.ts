@@ -15,6 +15,11 @@ export async function main(ns: NS): Promise<void> {
   }
 }
 
+/**
+ * Tries to crack all servers of a list with server names
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string[]} servers - List of server names which should be cracked
+ */
 export function crackServers(ns: NS, servers: string[]): void {
   const uncrackedServers: Set<string> = new Set<string>(servers);
   const crackedServers: Set<string> = new Set<string>();
@@ -25,6 +30,8 @@ export function crackServers(ns: NS, servers: string[]): void {
     if (server.hasAdminRights) {
       uncrackedServers.delete(server.hostname);
       crackedServers.add(server.hostname);
+
+      copyHackingScripts(ns, server.hostname);
       continue;
     }
 
@@ -34,16 +41,27 @@ export function crackServers(ns: NS, servers: string[]): void {
       uncrackedServers.delete(server.hostname);
       crackedServers.add(server.hostname);
     }
+
+    copyHackingScripts(ns, server.hostname);
   }
 
   printCrackProgress(ns, crackedServers, uncrackedServers);
 }
 
-function copyHackingScriptsToServer(ns: NS, server: string) {
-  const scripts: string[] = ["grow.js", "hack.js", "weaken.js"];
-  ns.scp(scripts, server);
+/**
+ * Copies scripts of the hacking functions to the given destination
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string} destination - Where the scripts should be copied to
+ */
+function copyHackingScripts(ns: NS, destination: string) {
+  const scripts: string[] = ["/hacking/grow.js", "/hacking/hack.js", "/hacking/weaken.js"];
+  ns.scp(scripts, destination);
 }
 
+/**
+ * Disables logging for specified functions
+ * @param {NS} ns - Mandatory to access netscript functions
+ */
 function disableLogs(ns: NS) {
   ns.disableLog("getHackingLevel");
   ns.disableLog("getServerRequiredHackingLevel");
@@ -53,6 +71,12 @@ function disableLogs(ns: NS) {
   ns.disableLog("scan");
 }
 
+/**
+ * Prints out current cracking progress
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {Set<string>} crackedServers - Set containing cracked servers
+ * @param {Set<string>} uncrackedServers - Set containig uncracked servers
+ */
 function printCrackProgress(
   ns: NS,
   crackedServers: Set<string>,
@@ -65,18 +89,36 @@ function printCrackProgress(
   uncrackedServers.forEach((server) => ns.print(server));
 }
 
+/**
+ * Checks if the given server can be cracked by
+ * * Checking if the hacking level is high enough
+ * * Checking if it can open enough ports on a server to get admin rights
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {Server} server - Server that will be checked
+ * @returns If the server can be cracked
+ */
 function canCrackServer(ns: NS, server: Server): boolean {
   return (
     hackLevelEnough(ns, server.hostname) && canOpenAllRequiredPorts(ns, server)
   );
 }
 
+/**
+ * Cracks the given server by opening ports and executing nuke
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {Server} server - Server which will be cracked
+ */
 function crackServer(ns: NS, server: Server) {
   openPorts(ns, server.hostname);
   ns.nuke(server.hostname);
-  copyHackingScriptsToServer(ns, server.hostname);
 }
 
+/**
+ * Checks if the required amount of ports can be opened on a server
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {Server} server - Server that will be checked
+ * @returns If the required amount of ports can be opened
+ */
 function canOpenAllRequiredPorts(ns: NS, server: Server) {
   const openPortsRequired = server.numOpenPortsRequired;
   if (openPortsRequired === undefined || server.hasAdminRights) {
@@ -99,26 +141,31 @@ function canOpenAllRequiredPorts(ns: NS, server: Server) {
   return openableProgramsCount >= openPortsRequired;
 }
 
-function openPorts(ns: NS, serverName: string) {
-  ns.print(`Initilizing server ${serverName} for scripts...`);
+/**
+ * Opens all openable ports of the given host
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string} host - Host for which the ports will be opened
+ */
+function openPorts(ns: NS, host: string) {
+  ns.print(`Initilizing server ${host} for scripts...`);
 
   if (ns.fileExists("BruteSSH.exe")) {
-    ns.brutessh(serverName);
+    ns.brutessh(host);
   }
 
   if (ns.fileExists("FTPCrack.exe")) {
-    ns.ftpcrack(serverName);
+    ns.ftpcrack(host);
   }
 
   if (ns.fileExists("relaySTMP.exe")) {
-    ns.relaysmtp(serverName);
+    ns.relaysmtp(host);
   }
 
   if (ns.fileExists("HTTPWorm.exe")) {
-    ns.httpworm(serverName);
+    ns.httpworm(host);
   }
 
   if (ns.fileExists("SQLInject.exe")) {
-    ns.sqlinject(serverName);
+    ns.sqlinject(host);
   }
 }

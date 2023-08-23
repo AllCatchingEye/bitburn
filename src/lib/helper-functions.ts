@@ -1,6 +1,13 @@
 import { NS } from "../../NetscriptDefinitions";
 
-export function getMaxPossibleThreads(
+/**
+ * Calculates how often a script can run on a host
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string} scriptName - Name of the script 
+ * @param host - Host on which the script will be run
+ * @returns Amount of threads that can be run on the target
+ */
+export function calculateThreadAmount(
   ns: NS,
   scriptName: string,
   host: string
@@ -13,6 +20,13 @@ export function getMaxPossibleThreads(
   return maxPossibleThreads;
 }
 
+/**
+ * Waits until the a script hat finished running
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {number} pid - PID of script that should be wait for
+ * @param {number} sleepIntervall - Determines the intervall, 
+ * which checks if the script is still running
+ */
 export async function waitUntilScriptFinished(
   ns: NS,
   pid: number,
@@ -23,8 +37,14 @@ export async function waitUntilScriptFinished(
   }
 }
 
-export function hackLevelEnough(ns: NS, server: string): boolean {
-  const hackLevelRequired = ns.getServerRequiredHackingLevel(server);
+/**
+ * Checks if the hack level is high enough for the server
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string} hostname - Name of the server that will be checked
+ * @returns If the hack level is high enough
+ */
+export function hackLevelEnough(ns: NS, hostname: string): boolean {
+  const hackLevelRequired = ns.getServerRequiredHackingLevel(hostname);
   const hackLevel = ns.getHackingLevel();
   return hackLevel >= hackLevelRequired;
 }
