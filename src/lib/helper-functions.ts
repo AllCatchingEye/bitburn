@@ -52,3 +52,14 @@ export function hackLevelEnough(ns: NS, hostname: string): boolean {
 export function hasSufficientThreads(threadAmount: number): boolean {
   return threadAmount > 0;
 }
+
+/**
+ * Disables logs for the given function names
+ * @param {NS} ns - Mandatory to access netscript functions
+ * @param {string[]} functionNames - List of function names for which the logs will be disabled
+ */
+export function disableLogs(ns: NS, functionNames: string[]): void {
+  functionNames.forEach((functionName) => {
+    ns.disableLog(functionName);
+  });
+}
