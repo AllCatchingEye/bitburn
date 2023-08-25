@@ -1,4 +1,4 @@
-import { NS, Server } from "../../NetscriptDefinitions";
+import { NS, Server } from "../NetscriptDefinitions";
 import { hackLevelEnough } from "/lib/helper-functions";
 import { searchServers } from "/lib/searchServers";
 
@@ -35,8 +35,8 @@ export function crackServers(ns: NS, servers: string[]): void {
       continue;
     }
 
-    if (canCrackServer(ns, server)) {
-      crackServer(ns, server);
+    if (canGetRootAccess(ns, server)) {
+      getRootAccess(ns, server);
 
       uncrackedServers.delete(server.hostname);
       crackedServers.add(server.hostname);
@@ -97,7 +97,7 @@ function printCrackProgress(
  * @param {Server} server - Server that will be checked
  * @returns If the server can be cracked
  */
-function canCrackServer(ns: NS, server: Server): boolean {
+function canGetRootAccess(ns: NS, server: Server): boolean {
   return (
     hackLevelEnough(ns, server.hostname) && canOpenAllRequiredPorts(ns, server)
   );
@@ -108,7 +108,7 @@ function canCrackServer(ns: NS, server: Server): boolean {
  * @param {NS} ns - Mandatory to access netscript functions
  * @param {Server} server - Server which will be cracked
  */
-function crackServer(ns: NS, server: Server) {
+function getRootAccess(ns: NS, server: Server) {
   openPorts(ns, server.hostname);
   ns.nuke(server.hostname);
 }
@@ -119,14 +119,20 @@ function crackServer(ns: NS, server: Server) {
  * @param {Server} server - Server that will be checked
  * @returns If the required amount of ports can be opened
  */
-function canOpenAllRequiredPorts(ns: NS, server: Server) {
-  const openPortsRequired = server.numOpenPortsRequired;
-  if (openPortsRequired === undefined || server.hasAdminRights) {
+function canOpenAllRequiredPorts(ns: NS, server: Server): boolean {
+  const portsAreOpen = server.hasAdminRights;
+  if (portsAreOpen) {
     return true;
+  } else if (server.numOpenPortsRequired !== undefined) {
+    const ownedPortOpenersCount = countPortOpeners(ns);
+    return ownedPortOpenersCount >= server.numOpenPortsRequired;
+  } else {
+    return false;
   }
+}
 
-  let openableProgramsCount = 0;
-  const programs = [
+function countPortOpeners(ns: NS) {
+  const portOpeners = [
     "BruteSSH.exe",
     "FTPCrack.exe",
     "relaySTMP.exe",
@@ -134,11 +140,12 @@ function canOpenAllRequiredPorts(ns: NS, server: Server) {
     "SQLInject.exe",
   ];
 
-  for (const program of programs) {
-    openableProgramsCount += Number(ns.fileExists(program));
+  let ownedPortOpenersCount = 0;
+  for (const portOpener of portOpeners) {
+    ownedPortOpenersCount += Number(ns.fileExists(portOpener));
   }
 
-  return openableProgramsCount >= openPortsRequired;
+  return ownedPortOpenersCount;
 }
 
 /**
