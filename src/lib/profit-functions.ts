@@ -42,12 +42,14 @@ function getMoreProfitableServer(server1: Server, server2: Server): Server {
  * @returns The profit of a server
  */
 export function getProfitOfServer(server: Server): number {
-  if (canMakeProfit(server)) {
+  let profit = 0;
+  if (canMakeProfitOn(server)) {
     /* neither of these variables can be undefined if you're in this case */
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return server.moneyMax! / server.minDifficulty!;
+    profit = server.moneyMax! / server.minDifficulty!
+    return profit;
   } else {
-    return 0;
+    return profit;
   }
 }
 
@@ -56,10 +58,13 @@ export function getProfitOfServer(server: Server): number {
  * @param {Server} server - Server which is is checked for profit 
  * @returns If a server can make a profit
  */
-function canMakeProfit(server: Server): boolean {
+function canMakeProfitOn(server: Server): boolean {
+  const serverHasMoney = server.moneyMax !== undefined;
+  const serverHasSecurity = server.minDifficulty !== undefined;
+
   return (
     server.hasAdminRights &&
-    server.moneyMax !== undefined &&
-    server.minDifficulty !== undefined
+    serverHasMoney &&
+    serverHasSecurity
   );
 }

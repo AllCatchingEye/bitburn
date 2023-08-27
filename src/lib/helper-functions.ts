@@ -3,21 +3,21 @@ import { NS } from "../../NetscriptDefinitions";
 /**
  * Calculates how often a script can run on a host
  * @param {NS} ns - Mandatory to access netscript functions
- * @param {string} scriptName - Name of the script 
- * @param host - Host on which the script will be run
+ * @param {string} script - Name of the script 
+ * @param hostname - Host on which the script will be run
  * @returns Amount of threads that can be run on the target
  */
 export function calculateThreadAmount(
   ns: NS,
-  scriptName: string,
-  host: string
+  script: string,
+  hostname: string
 ): number {
-  const scriptRamCost = ns.getScriptRam(scriptName);
-  const availableRamOnServer =
-    ns.getServerMaxRam(host) - ns.getServerUsedRam(host);
+  const scriptRamCost = ns.getScriptRam(script);
+  const availableRamOnHost =
+    ns.getServerMaxRam(hostname) - ns.getServerUsedRam(hostname);
 
-  const maxPossibleThreads = Math.floor(availableRamOnServer / scriptRamCost);
-  return maxPossibleThreads;
+  const threadAmount = Math.floor(availableRamOnHost / scriptRamCost);
+  return threadAmount;
 }
 
 /**
@@ -44,13 +44,9 @@ export async function waitUntilScriptFinished(
  * @returns If the hack level is high enough
  */
 export function hackLevelEnough(ns: NS, hostname: string): boolean {
-  const hackLevelRequired = ns.getServerRequiredHackingLevel(hostname);
-  const hackLevel = ns.getHackingLevel();
-  return hackLevel >= hackLevelRequired;
-}
-
-export function hasSufficientThreads(threadAmount: number): boolean {
-  return threadAmount > 0;
+  const requiredHackingLevel = ns.getServerRequiredHackingLevel(hostname);
+  const playerHackingLevel = ns.getHackingLevel();
+  return playerHackingLevel >= requiredHackingLevel;
 }
 
 /**
