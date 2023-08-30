@@ -6,9 +6,9 @@ export async function main(ns: NS): Promise<void> {
   disableLogs(ns);
 
   const root = "home";
-  const servers: string[] = searchServers(ns, root);
-
+  
   while (true) {
+    const servers: string[] = searchServers(ns, root);
     await crackServers(ns, servers);
 
     await ns.sleep(10000);
