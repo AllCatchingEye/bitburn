@@ -13,6 +13,7 @@ async function deploy(ns: NS) {
     const target = ns.getServer(mostProfitableServer(ns));
     let [hackThreads, hackSecurityThreads, growThreads, growSecurityThreads]
       = calculateThreads(ns, target);
+    const weakenThreads = hackSecurityThreads + growSecurityThreads;
 
     // search hosts and filter them for running scripts on them
     const hosts: string[] = searchServers(ns, "home")
@@ -22,18 +23,20 @@ async function deploy(ns: NS) {
       .filter((server) => server.maxRam !== 0)
       .map(server => server.hostname);
 
-    distributeScript(ns, 'hacking/grow.js', hosts, growThreads, target.hostname);
+    const hackTime = ns.getHackTime(target.hostname);
+    const weakenTime = ns.getWeakenTime(target.hostname);
+    const growTime = ns.getGrowTime(target.hostname);
 
-    await ns.sleep(10);
-    const weakenThreads = hackSecurityThreads + growSecurityThreads;
     distributeScript(ns, 'hacking/weaken.js', hosts, weakenThreads, target.hostname);
 
-    const weakenTime = ns.getWeakenTime(target.hostname);
-    const hackTime = ns.getHackTime(target.hostname);
-    await ns.sleep(weakenTime - hackTime - 10);
+    //await ns.sleep(Math.max(sleepTime, 0));
+    distributeScript(ns, 'hacking/grow.js', hosts, growThreads, target.hostname);
+
+    //sleepTime = weakenTime - hackTime - sleepTime;
+    //await ns.sleep(Math.max(sleepTime, 0))
     distributeScript(ns, 'hacking/hack.js', hosts, hackThreads, target.hostname);
 
-    await ns.sleep(hackTime);
+    await ns.sleep(Math.min(hackTime, weakenTime, growTime));
   }
 }
 
@@ -51,26 +54,27 @@ function execute(ns: NS, script: string, host: string, threads: number, target: 
 
   if (runnableThreads > 0) {
     ns.exec(script, host, runnableThreads, target);
+    ns.print(`INFO Starting ${script} ${runnableThreads} times on ${host} for ${target}`);
   }
 
   return Math.floor(threads) - runnableThreads;
 }
 
 function calculateThreads(ns: NS, target: Server) {
-  const hackThreads = ns.hackAnalyzeThreads(target.hostname, target.moneyMax!);
-  const hackSecurityThreads = calculateSecurityThreads(ns, "hacking/hack.js", hackThreads);
+  const hackThreads = Math.ceil(ns.hackAnalyzeThreads(target.hostname, target.moneyMax!));
+  const hackSecurityThreads = calculateSecurityThreads(ns, "hacking/hack.js", hackThreads, target);
 
-  const growThreads = calculateGrowThreads(ns, target.moneyAvailable!, target);
-  const growSecurityThreads = calculateSecurityThreads(ns, "hacking/grow.js", growThreads);
+  const growThreads = calculateGrowThreads(ns, target);
+  const growSecurityThreads = calculateSecurityThreads(ns, "hacking/grow.js", growThreads, target);
 
   return [hackThreads, hackSecurityThreads, growThreads, growSecurityThreads];
 }
 
-function calculateGrowThreads(ns: NS, availableMoney: number, target: Server) {
-  const targetGrowth = (target.moneyMax! + 1) / (availableMoney + 1);
-  const growThreads = ns.growthAnalyze(target.hostname, targetGrowth);
+function calculateGrowThreads(ns: NS, target: Server) {
+  const multiplier = target.moneyMax! / target.moneyAvailable!;
+  const growThreads = ns.growthAnalyze(target.hostname, multiplier);
 
-  return growThreads;
+  return Math.ceil(growThreads);
 }
 
 export function getMaxPossibleThreads(ns: NS, script: string,
@@ -83,14 +87,15 @@ export function getMaxPossibleThreads(ns: NS, script: string,
   return maxPossibleThreads;
 }
 
-function calculateSecurityThreads(ns: NS, script: string, threads: number) {
+function calculateSecurityThreads(ns: NS, script: string, threads: number, target: Server) {
   let securityIncrease = 0;
   if (script == "hacking/hack.js") {
-    securityIncrease = ns.hackAnalyzeSecurity(threads);
+    securityIncrease = ns.hackAnalyzeSecurity(threads, target.hostname);
   } else {
-    securityIncrease = ns.growthAnalyzeSecurity(threads);
+    securityIncrease = ns.growthAnalyzeSecurity(threads, target.hostname);
   }
 
-  const securityThreads = securityIncrease / ns.weakenAnalyze(1);
-  return securityThreads;
+  const securityReduction = (target.hackDifficulty! + securityIncrease - target.minDifficulty!);
+  const securityThreads = securityReduction / ns.weakenAnalyze(1);
+  return Math.ceil(securityThreads);
 }

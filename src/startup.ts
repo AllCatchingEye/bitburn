@@ -13,6 +13,6 @@ export async function main(ns: NS) {
 
   const serverCracker = ns.run("server-cracker.js");
 
-  const hackDeployer = ns.run("hacking/deployer.js");
+  const hackDeployer = ns.run("hacking/newDeployer.js");
 }
 
