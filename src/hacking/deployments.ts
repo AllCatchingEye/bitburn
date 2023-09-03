@@ -1,71 +1,44 @@
 import { NS, Server } from "@ns";
 import { Deployment } from "/hacking/deployment";
 import { searchServers } from "/lib/searchServers";
-import { mostProfitableServer } from "/lib/profit-functions";
 
 export class Deployments {
   readonly ns: NS;
+  deployedHosts: Set<string>;
   deployments: Deployment[];
-  target: string;
 
   constructor(ns: NS) {
     this.ns = ns;
-    this.target = mostProfitableServer(this.ns);
+    this.deployedHosts = new Set<string>();
     this.deployments = [];
   }
 
   update(): void {
-    this.target = mostProfitableServer(this.ns);
     this.addNewHosts();
-
-    this.deployScripts();
-  }
-
-  deployScripts(): void {
-    const inactiveDeployments = this.getInactiveDeployments();
-    inactiveDeployments.forEach((deployment) =>
-      deployment.deployScript(this.ns, this.target)
-    );
   }
 
   addNewHosts(): void {
     const newHosts: Server[] = this.findNewHosts();
-    newHosts.forEach((newHost) => this.addHostToDeployments(newHost));
+    newHosts
+      .filter((host) => !this.deployedHosts.has(host.hostname)) // new hosts
+      .forEach((host) => this.addHostToDeployments(host));
   }
 
   addHostToDeployments(host: Server): void {
-    if (!this.includes(host)) {
+    if (this.deployedHosts.has(host.hostname)) {
       const newDeployment: Deployment = new Deployment(
         this.ns,
         host,
       );
       this.deployments.push(newDeployment);
+      newDeployment.start();
     }
   }
 
-  getInactiveDeployments(): Deployment[] {
-    const inactiveDeployments = this.deployments.filter(
-      (deployment) => !deployment.isActive(this.ns)
-    );
-    return inactiveDeployments;
-  }
-
-  includes(host: Server): boolean {
-    return this.deployments.map((deployment) => deployment.host.hostname).includes(host.hostname);
-  }
-
   findNewHosts(): Server[] {
-    const foundHosts: Server[] = this.findHosts();
-    const deployedHosts: Server[] = this.deployments.map(
-      (deployment) => deployment.host
-    );
-
-    const isNewHost = (host: Server): boolean => {
-      return !deployedHosts.includes(host);
-    };
-
-    const newHosts: Server[] = foundHosts.filter((foundHost) =>
-      isNewHost(foundHost)
+    const hosts: Server[] = this.findHosts();
+    const newHosts: Server[] = hosts.filter((host) =>
+      this.deployedHosts.has(host.hostname)
     );
     return newHosts;
   }
