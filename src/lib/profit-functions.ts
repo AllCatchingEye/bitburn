@@ -46,7 +46,7 @@ export function getProfitOfServer(server: Server): number {
   if (canMakeProfitOn(server)) {
     /* neither of these variables can be undefined if you're in this case */
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    profit = (100 - server.minDifficulty!) * server.moneyMax!;
+    profit = server.moneyMax! / server.minDifficulty!;
     return profit;
   } else {
     return profit;
