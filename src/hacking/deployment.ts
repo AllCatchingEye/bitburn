@@ -13,14 +13,14 @@ export class Deployment {
     this.target = mostProfitableServer(this.ns);
   }
 
-  deployScript(): void {
+  async deployScript() {
     while (true) {
       this.target = mostProfitableServer(this.ns);
-      this.start();
+      await this.start();
     }
   }
 
-  start() {
+  async start() {
     const targetServer = this.ns.getServer(this.host.hostname);
     const availableMohney = targetServer.moneyAvailable!;
 
@@ -31,10 +31,15 @@ export class Deployment {
     const growSecurityThreads = this.calculateSecurityThreads("hacking/grow.js", growThreads);
 
     this.execute("hacking/hack.js", hackThreads);
+
+    await this.ns.sleep(100);
     this.execute("hacking/weaken.js", hackSecurityThreads);
 
+    await this.ns.sleep(100);
     this.execute("hacking/grow.js", growThreads);
-    this.execute("hacking/weaken.js", growSecurityThreads);
+
+    await this.ns.sleep(100);
+    await this.execute("hacking/weaken.js", growSecurityThreads);
   }
 
   calculateGrowThreads(availableMoney: number, target: Server) {
@@ -53,11 +58,12 @@ export class Deployment {
     } else {
       this.ns.print("ERROR unknown script");
     }
+
     const securityThreads = securityIncrease / this.ns.weakenAnalyze(1);
     return securityThreads;
   }
 
-  execute(script: string, threads: number) {
+  async execute(script: string, threads: number) {
     let threadsLeft = Math.floor(threads);
     while (threadsLeft > 0) {
       const maxPossibleThreads = calculateThreadAmount(this.ns, script, this.host.hostname);
@@ -66,7 +72,7 @@ export class Deployment {
       threadsLeft -= runnableThreads;
 
       if (threadsLeft > 0) {
-        this.waitTillFinished(pid);
+        await this.waitTillFinished(pid);
       }
     }
   }
