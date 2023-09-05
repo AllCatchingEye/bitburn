@@ -43,12 +43,14 @@ async function deploy(ns: NS) {
     const [hackThreads, hackWeakenThreads, growThreads, growWeakenThreads] =
       getThreadsForAllScripts(ns, target);
 
-    const [hackTime, growTime, weakenTime] = getTimings(ns, target);
+    const [, growTime,] = getTimings(ns, target);
 
-    const hack = createTask(target, hosts, ScriptType.Hack, hackThreads, hackTime);
-    const hackWeaken = createTask(target, hosts, ScriptType.Weaken, hackWeakenThreads, weakenTime);
-    const grow = createTask(target, hosts, ScriptType.Grow, growThreads, growTime);
-    const growWeaken = createTask(target, hosts, ScriptType.Weaken, growWeakenThreads, weakenTime);
+    // To negate the security increase by hack, weaken should be startet first
+    // The rest can be startet simultanously because theiy execute after at different times
+    const hackWeaken = createTask(target, hosts, ScriptType.Weaken, hackWeakenThreads, 0);
+    const hack = createTask(target, hosts, ScriptType.Hack, hackThreads, growTime + 20);
+    const grow = createTask(target, hosts, ScriptType.Grow, growThreads, growTime + 40);
+    const growWeaken = createTask(target, hosts, ScriptType.Weaken, growWeakenThreads, growTime + 60);
     const tasks = [hack, hackWeaken, grow, growWeaken];
 
     tasks.forEach(task => {
