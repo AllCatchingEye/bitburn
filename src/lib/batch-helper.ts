@@ -72,11 +72,17 @@ export function execute(ns: NS, script: string, host: string, threads: number, t
 
 export function getUsableHosts(ns: NS) {
   const hosts: string[] = searchServers(ns, "home");
-  const filteredHosts: string[] = hosts.map((serverName) => ns.getServer(serverName))
+  const filteredHosts: Server[] = hosts.map((serverName) => ns.getServer(serverName))
     .filter((server) => server.hostname !== "home")
     .filter((server) => server.hasAdminRights)
-    .filter((server) => server.maxRam !== 0)
-    .map(server => server.hostname);
+    .filter((server) => server.maxRam !== 0);
   return filteredHosts;
 }
 
+export function getTimings(ns: NS, target: Server) {
+  const hackDelay = ns.getHackTime(target.hostname);
+  const growDelay = ns.getGrowTime(target.hostname);
+  const weakenDelay = ns.getWeakenTime(target.hostname);
+
+  return [hackDelay, growDelay, weakenDelay];
+}
