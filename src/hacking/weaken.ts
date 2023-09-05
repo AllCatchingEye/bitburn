@@ -6,6 +6,7 @@ import { NS } from "../../NetscriptDefinitions";
  * @argument {string} target - Server name of the target
  */
 export async function main(ns: NS): Promise<void> {
-    const target = ns.args[0] as string;
-    await ns.weaken(target);
+  const target = ns.args[0] as string;
+  const delay = ns.args[1] as number;
+  await ns.weaken(target, { additionalMsec: delay });
 }
