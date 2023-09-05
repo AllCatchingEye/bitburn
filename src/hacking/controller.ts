@@ -1,5 +1,5 @@
 import { NS, Server } from "@ns";
-import { getGrowThreads, getWeakenThreads, distributeScript, getUsableHosts } from "lib/batch-helper";
+import { getGrowThreads, getWeakenThreads, distributeScript, getUsableHosts, getThreadsForAllScripts } from "lib/batch-helper";
 import { mostProfitableServer } from "/lib/profit-functions";
 
 export interface Batch {
@@ -23,17 +23,33 @@ async function deploy(ns: NS) {
   await prepareTarget(ns, hosts, target)
   ns.print(`INFO Server is prepared`);
 
+  let nextNewPort = 0;
+  while (true) {
+    const [hackThreads, hackWeakenThreads, growThreads, growWeakenThreads] =
+      getThreadsForAllScripts(ns, target);
+
+    const batch: Batch = {
+      target: target,
+      hosts: getUsableHosts(ns),
+      hackThreads: hackThreads,
+      hackWeakenThreads: hackWeakenThreads,
+      growThreads: growThreads,
+      growWeakenThreads: growWeakenThreads,
+    }
+
+    ns.run("hacking/worker.js", nextNewPort);
+    ns.writePort(nextNewPort, JSON.stringify(batch));
+    nextNewPort++;
+  }
 }
 
 async function prepareTarget(ns: NS, hosts: string[], target: Server) {
   if (targetIsPrepared(target)) {
     return;
   }
-
   ns.print(`INFO Preparing target server...`);
 
-  const growThreads = getGrowThreads(ns, target);
-  const weakenThreads = getWeakenThreads(ns, "hacking/weaken.js", growThreads, target);
+  const [, , growThreads, weakenThreads] = getThreadsForAllScripts(ns, target);
   distributeScript(ns, "hacking/weaken.js", hosts, weakenThreads, target.hostname);
 
   await ns.sleep(getGrowDelay(ns, target));

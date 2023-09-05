@@ -1,6 +1,16 @@
 import { NS, Server } from "@ns";
 import { searchServers } from "/lib/searchServers";
 
+export function getThreadsForAllScripts(ns: NS, target: Server) {
+  const hackThreads = Math.ceil(ns.hackAnalyzeThreads(target.hostname, target.moneyMax!));
+  const hackWeakenThreads = getWeakenThreads(ns, "hacking/hack.js", hackThreads, target);
+
+  const growThreads = getGrowThreads(ns, target);
+  const growWeakenThreads = getWeakenThreads(ns, "hacking/grow.js", growThreads, target);
+
+  return [hackThreads, hackWeakenThreads, growThreads, growWeakenThreads];
+}
+
 export function getGrowThreads(ns: NS, target: Server) {
   if (ns.fileExists("Formulas.exe")) {
     return ns.formulas.hacking.growThreads(target, ns.getPlayer(), target.moneyMax!);
