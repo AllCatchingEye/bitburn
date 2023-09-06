@@ -11,7 +11,7 @@ export function getThreadsForAllScripts(ns: NS, target: Server) {
   return [hackThreads, hackWeakenThreads, growThreads, growWeakenThreads];
 }
 
-export function getGrowThreads(ns: NS, target: Server) {
+function getGrowThreads(ns: NS, target: Server) {
   if (ns.fileExists("Formulas.exe")) {
     return ns.formulas.hacking.growThreads(target, ns.getPlayer(), target.moneyMax!);
   }
@@ -22,7 +22,7 @@ export function getGrowThreads(ns: NS, target: Server) {
   return Math.ceil(growThreads);
 }
 
-export function getWeakenThreads(ns: NS, script: string, threads: number, target: Server) {
+function getWeakenThreads(ns: NS, script: string, threads: number, target: Server) {
   const currentSecurity = target.hackDifficulty! - target.minDifficulty!;
   const securityIncrease = getSecurityIncrease(ns, script, threads, target);
   const weakenThreads = (securityIncrease + currentSecurity) / ns.weakenAnalyze(1);
@@ -39,7 +39,7 @@ export function getMaxPossibleThreads(ns: NS, script: string,
   return maxPossibleThreads;
 }
 
-export function getSecurityIncrease(ns: NS, script: string, threads: number, target: Server) {
+function getSecurityIncrease(ns: NS, script: string, threads: number, target: Server) {
   let securityIncrease = 0;
   if (script == "hacking/hack.js") {
     securityIncrease = ns.hackAnalyzeSecurity(threads, target.hostname);
@@ -58,7 +58,7 @@ export function distributeScript(ns: NS, script: string,
   })
 }
 
-export function execute(ns: NS, script: string, host: string, threads: number, target: string) {
+function execute(ns: NS, script: string, host: string, threads: number, target: string) {
   const maxPossibleThreads = getMaxPossibleThreads(ns, script, host);
   const runnableThreads = Math.floor(Math.min(threads, maxPossibleThreads));
 

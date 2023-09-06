@@ -1,49 +1,44 @@
-import { NetscriptPort, NS, Server } from "../../NetscriptDefinitions";
+import { NetscriptPort, NS } from "../../NetscriptDefinitions";
 import { toNumber } from "lodash";
-import { Task, ScriptType } from "./controller";
+import { Task } from "./task";
 import { getMaxPossibleThreads } from "/lib/batch-helper";
 
 export async function main(ns: NS): Promise<void> {
+  const port: NetscriptPort = getPort(ns);
+  const task: Task = await getTask(port);
+  while (true) {
+    runTask(ns, task);
+  }
+}
+
+function getPort(ns: NS): NetscriptPort {
   const portNumber: number = toNumber(ns.args[0]);
   const port: NetscriptPort = ns.getPortHandle(portNumber);
+  return port;
+}
 
+async function getTask(port: NetscriptPort) {
   await port.nextWrite();
   const data: string = port.read() as string;
   const task: Task = JSON.parse(data);
-  while (true) {
-    const script = determineScript(task.script);
-    task.hosts.forEach(host => {
-      task.threads = startScripts(ns, script, host, task);
-    })
-  }
+  return task;
 }
 
-function startScripts(ns: NS, script: string, host: Server, task: Task) {
-  let threadsLeft = task.threads;
-  if (task.threads > 0) {
-    const runnableThreadsOnHost = Math.min(getMaxPossibleThreads(ns, script, host.hostname), threadsLeft);
-
-    ns.exec(script, host.hostname, threadsLeft, task.delay);
-    threadsLeft -= runnableThreadsOnHost;
-  }
-  return threadsLeft;
+function runTask(ns: NS, task: Task): void {
+  task.hosts.forEach(host => {
+    if (task.threads > 0) {
+      startScripts(ns, host.hostname, task);
+    }
+  })
 }
 
-function determineScript(scriptType: ScriptType) {
-  let script = "";
-  switch (scriptType) {
-    case ScriptType.Hack:
-      script = "hacking/hack.js";
-      break;
-    case ScriptType.Grow:
-      script = "hacking/grow.js";
-      break;
-    case ScriptType.Weaken:
-      script = "hacking/weaken.js";
-      break;
-    default:
-      script = "unknown";
-      break;
-  }
-  return script;
+function startScripts(ns: NS, hostname: string, task: Task) {
+  const runnableThreadsOnHost = calculateRunnableThreads(ns, task, hostname);
+  ns.exec(task.script, hostname, runnableThreadsOnHost, task.delay);
+  task.threads - runnableThreadsOnHost;
+}
+
+function calculateRunnableThreads(ns: NS, task: Task, hostname: string): number {
+  const runnableThreadsOnHost = Math.min(getMaxPossibleThreads(ns, task.script, hostname), task.threads);
+  return runnableThreadsOnHost;
 }
