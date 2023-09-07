@@ -1,25 +1,25 @@
 import { NetscriptPort, NS } from "../../NetscriptDefinitions";
-import { toNumber } from "lodash";
-import { Task } from "./task";
+import { hackingLog, HackLogType } from "./logger";
+import { Task } from "/hacking/task";
 import { getMaxPossibleThreads } from "/lib/batch-helper";
 
 export async function main(ns: NS): Promise<void> {
-  const port: NetscriptPort = getPort(ns);
+  const [port, portNumber] = getPort(ns);
   const task: Task = await getTask(port);
-  while (true) {
-    runTask(ns, task);
-  }
+  await hackingLog(ns, HackLogType.receivedTask, portNumber);
+
+  runTask(ns, task);
 }
 
-function getPort(ns: NS): NetscriptPort {
-  const portNumber: number = toNumber(ns.args[0]);
+function getPort(ns: NS): [NetscriptPort, number] {
+  const portNumber: number = (ns.args[0]) as number;
   const port: NetscriptPort = ns.getPortHandle(portNumber);
-  return port;
+  return [port, portNumber];
 }
 
-async function getTask(port: NetscriptPort) {
-  await port.nextWrite();
+async function getTask(port: NetscriptPort): Promise<Task> {
   const data: string = port.read() as string;
+
   const task: Task = JSON.parse(data);
   return task;
 }
@@ -32,9 +32,9 @@ function runTask(ns: NS, task: Task): void {
   })
 }
 
-function startScripts(ns: NS, hostname: string, task: Task) {
+function startScripts(ns: NS, hostname: string, task: Task): void {
   const runnableThreadsOnHost = calculateRunnableThreads(ns, task, hostname);
-  ns.exec(task.script, hostname, runnableThreadsOnHost, task.delay);
+  ns.exec(task.script, hostname, runnableThreadsOnHost, task.target.hostname, task.delay);
   task.threads - runnableThreadsOnHost;
 }
 

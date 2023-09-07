@@ -1,5 +1,5 @@
-import { Server } from "@ns"
-import { Controller } from "./controller";
+import { NS, Server } from "@ns"
+import { Controller } from "/hacking/controller";
 import { getThreadsForAllScripts, getTimings } from "/lib/batch-helper";
 
 export interface Task {
@@ -11,10 +11,12 @@ export interface Task {
 }
 
 export function createTask(controller: Controller, script: string,
-  threads: number, delay: number = 0): Task {
+  threads: number, delay = 0): Task {
+  const target: Server = controller.target;
+  const hosts: Server[] = controller.hosts;
   const task = {
-    target: controller.target,
-    hosts: controller.hosts,
+    target: target,
+    hosts: hosts,
     script: script,
     threads: threads,
     delay: delay,
@@ -31,10 +33,10 @@ export function createBatch(ns: NS, controller: Controller): Task[] {
   // To negate the security increase by hack, weaken should be startet first
   // The rest can be startet simultanously with a slight delay between them because they 
   // finish in order 
-  const hack: Task = createTask(controller, 'hacking/hack.js', hackThreads, weaken1Delay);
-  const weaken1: Task = createTask(controller, 'hacking/weaken.js', weaken1Threads, hackDelay);
-  const grow: Task = createTask(controller, 'hacking/grow.js', growThreads, growDelay);
-  const weaken2: Task = createTask(controller, 'hacking/weaken.js', weaken2Threads, weaken2Delay);
+  const hack: Task = createTask(controller, '/hacking/hack.js', hackThreads, weaken1Delay);
+  const weaken1: Task = createTask(controller, '/hacking/weaken.js', weaken1Threads, hackDelay);
+  const grow: Task = createTask(controller, '/hacking/grow.js', growThreads, growDelay);
+  const weaken2: Task = createTask(controller, '/hacking/weaken.js', weaken2Threads, weaken2Delay);
   const tasks: Task[] = [hack, weaken1, grow, weaken2];
 
   return tasks;

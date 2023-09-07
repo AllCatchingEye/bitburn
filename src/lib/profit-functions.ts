@@ -5,30 +5,30 @@ export async function main(ns: NS): Promise<void> {
   ns.tprint(mostProfitableServer(ns));
 }
 
-/**
- * Calculates the currently most profitable server to hack
- * @param {NS} ns - Mandatory to access netscript functions
- * @returns Most profitable server to hack
- */
 export function mostProfitableServer(ns: NS): string {
-  const servers = searchServers(ns, "home");
-
-  const mostProfitableServer: Server = servers.reduce(
-    (currentServer, nextServer) => {
-      return getMoreProfitableServer(currentServer, ns.getServer(nextServer));
-    },
-    ns.getServer(servers[0])
-  );
+  const hackableServers: Server[] = getHackableServers(ns);
+  const mostProfitableServer = findMostProfitableServer(hackableServers);
 
   return mostProfitableServer.hostname;
 }
 
-/**
- * Calculates the more profitable server of two given servers
- * @param {Server} server1 - First server
- * @param {Server} server2 - Second server
- * @returns The more profitable server
- */
+function findMostProfitableServer(hackableServers: Server[]): Server {
+  const mostProfitableServer: Server = hackableServers.reduce(
+    (currentServer, nextServer) => {
+      return getMoreProfitableServer(currentServer, nextServer);
+    },
+  );
+  return mostProfitableServer;
+}
+
+function getHackableServers(ns: NS): Server[] {
+  const servers: Server[] = searchServers(ns, "home")
+    .map(serverName => ns.getServer(serverName))
+    .filter(server => !(server.requiredHackingSkill === undefined))
+    .filter(server => server.requiredHackingSkill! <= ns.getPlayer().skills.hacking);
+  return servers;
+}
+
 function getMoreProfitableServer(server1: Server, server2: Server): Server {
   const server1Profit = getProfitOfServer(server1);
   const server2Profit = getProfitOfServer(server2);
@@ -36,11 +36,6 @@ function getMoreProfitableServer(server1: Server, server2: Server): Server {
   return server1Profit >= server2Profit ? server1 : server2;
 }
 
-/**
- * Calculates the profit of a server
- * @param {Server} server - The server for which the profit is being calculated
- * @returns The profit of a server
- */
 export function getProfitOfServer(server: Server): number {
   let profit = 0;
   if (canMakeProfitOn(server)) {
@@ -53,11 +48,6 @@ export function getProfitOfServer(server: Server): number {
   }
 }
 
-/**
- * Checks if you can make a profit on the given server
- * @param {Server} server - Server which is is checked for profit 
- * @returns If a server can make a profit
- */
 function canMakeProfitOn(server: Server): boolean {
   const serverHasMoney = server.moneyMax !== undefined;
   const serverHasSecurity = server.minDifficulty !== undefined;
