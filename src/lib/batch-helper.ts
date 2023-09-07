@@ -1,4 +1,5 @@
 import { NS, Server } from "@ns";
+import { Task } from "/hacking/task";
 import { searchServers } from "/lib/searchServers";
 
 export function getThreadsForAllScripts(ns: NS, target: Server) {
@@ -70,7 +71,7 @@ function execute(ns: NS, script: string, host: string, threads: number, target: 
   return Math.floor(threads) - runnableThreads;
 }
 
-export function getUsableHosts(ns: NS) {
+export function getUsableHosts(ns: NS): Server[] {
   const hosts: string[] = searchServers(ns, "home");
   const filteredHosts: Server[] = hosts.map((serverName) => ns.getServer(serverName))
     .filter((server) => server.hostname !== "home")
@@ -85,4 +86,52 @@ export function getTimings(ns: NS, target: Server) {
   const weakenDelay = ns.getWeakenTime(target.hostname);
 
   return [hackDelay, growDelay, weakenDelay];
+}
+
+export async function waitTillEnoughRamAvailable(ns: NS, tasks: Task[]): Promise<void> {
+  while (!batchHasEnoughRam(ns, tasks)) {
+    await ns.sleep(1000);
+  }
+  return;
+}
+
+export function batchHasEnoughRam(ns: NS, tasks: Task[]): boolean {
+  const availableRamAcrossHosts = calculateAvailableRamAcrossHosts(ns);
+  const batchRamCost = calculateBatchRamCost(ns, tasks);
+  const batchHasEnoughRam = availableRamAcrossHosts > batchRamCost;
+  return batchHasEnoughRam;
+}
+
+function calculateAvailableRamAcrossHosts(ns: NS) {
+  const hosts = getUsableHosts(ns);
+  let availableRamAcrossHosts = 0;
+  hosts.forEach(host => {
+    availableRamAcrossHosts += calculateAvailableRamOnHost(ns, host);
+  })
+  return availableRamAcrossHosts;
+}
+
+function calculateAvailableRamOnHost(ns: NS, host: Server): number {
+  const availableRamOnHost = host.maxRam - host.ramUsed;
+  const minimumRequiredRam = ns.getScriptRam("hacking/weaken.js");
+  if (availableRamOnHost > minimumRequiredRam) {
+    return availableRamOnHost;
+  } else {
+    return 0;
+  }
+}
+
+function calculateBatchRamCost(ns: NS, tasks: Task[]): number {
+  let batchRamCost = 0;
+  tasks.forEach(task => {
+    const taskRamCost = calculateTaskRamUsage(ns, task);
+    batchRamCost += taskRamCost;
+  })
+  return batchRamCost;
+}
+
+function calculateTaskRamUsage(ns: NS, task: Task): number {
+  const scriptRamCost = ns.getScriptRam(task.script);
+  const taskRamCost = scriptRamCost * task.threads;
+  return taskRamCost;
 }
