@@ -5,14 +5,25 @@ import { NS } from "@ns";
  * @param {NS} ns - Mandatory to access netscript functions
  */
 export async function main(ns: NS) {
-  const watcherPid = ns.run("watcher.js");
+  const host = "home";
+  if (!ns.scriptRunning("watcher.js", host)) {
+    ns.run("watcher.js");
+  }
 
-  const expandServersPid = ns.run("expand-servers.js");
+  if (!ns.scriptRunning("expand-servers.js", host)) {
+    ns.run("expand-servers.js");
+  }
 
-  // const hacknetNodesUpgraderPid = ns.exec("hacknet-nodes-upgrader.js", "home");
+  if (!ns.scriptRunning("server-cracker.js", host)) {
+    ns.run("server-cracker.js");
+  }
 
-  const serverCracker = ns.run("server-cracker.js");
+  if (!ns.scriptRunning("/hacking/controller.js", host)) {
+    ns.run("/hacking/controller.js");
+  }
 
-  const hackDeployer = ns.run("hacking/newDeployer.js");
+  if (!ns.scriptRunning("hacknet-nodes-upgrader.js", host)) {
+    //ns.run("hacknet-nodes-upgrader.js");
+  }
 }
 

@@ -8,6 +8,8 @@ export enum HackLogType {
   dispatch,
   sendTask,
   receivedTask,
+  deployTasks,
+  tasksDeployed,
 }
 
 export async function hackingLog(ns: NS, logType: HackLogType, ...args: any): Promise<void> {
@@ -22,7 +24,7 @@ export async function hackingLog(ns: NS, logType: HackLogType, ...args: any): Pr
       await ns.write("log.txt", `INFO Target ${args} is prepared\n`, "a");
       break;
     case HackLogType.newDeployment:
-      await ns.write("log.txt", `Deploying new batch...`, "a");
+      await ns.write("log.txt", `Deploying new batch...\n`, "a");
       break;
     case HackLogType.dispatch:
       await ns.write("log.txt",
@@ -36,7 +38,17 @@ export async function hackingLog(ns: NS, logType: HackLogType, ...args: any): Pr
       break;
     case HackLogType.receivedTask:
       await ns.write("log.txt",
-        `Worker on port ${args} received task from controller`,
+        `Worker on port ${args} received task from controller\n`,
+        "a");
+      break;
+    case HackLogType.deployTasks:
+      await ns.write("log.txt",
+        `Worker on port ${args[0]} deploys ${args[1]} with ${args[2]} threads\n`,
+        "a");
+      break;
+    case HackLogType.tasksDeployed:
+      await ns.write("log.txt",
+        `Worker on port ${args[0]} finished deployment\n`,
         "a");
       break;
     default:

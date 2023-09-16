@@ -1,4 +1,4 @@
-import { NS } from "@ns";
+import { NS, Server } from "@ns";
 
 export async function main(ns: NS): Promise<void> {
   const root: string = ns.args[0].toString();
@@ -11,7 +11,16 @@ export async function main(ns: NS): Promise<void> {
 export function searchServers(ns: NS, root: string): string[] {
   const serverFilter = new Set<string>();
   const searchResult = scanServer(ns, root, serverFilter);
+  searchResult.push(root);
   return searchResult;
+}
+
+export function getUsableHosts(ns: NS): Server[] {
+  const hosts: string[] = searchServers(ns, "home");
+  const filteredHosts: Server[] = hosts.map((serverName) => ns.getServer(serverName))
+    .filter((server) => server.hasAdminRights)
+    .filter((server) => server.maxRam !== 0);
+  return filteredHosts;
 }
 
 function scanServer(ns: NS, scanTarget: string, foundServersFilter: Set<string>): string[] {

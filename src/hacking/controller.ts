@@ -1,101 +1,168 @@
 import { NetscriptPort, NS, Server } from "@ns"
-import { Task, createBatch } from "/hacking/task";
-import { getUsableHosts, waitTillEnoughRamAvailable } from "/lib/batch-helper";
+import { Scripts } from "/lib/batch-helper";
+import { Target } from "/hacking/target";
+import { Task, createBatch, createTask } from "/hacking/task";
+import { batchHasEnoughRam, reduceThreadAmount, waitTillEnoughRamAvailable } from "/lib/ram-helper";
+import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
+import { getUsableHosts } from "/lib/searchServers";
 import { mostProfitableServer } from "/lib/profit-functions";
 import { disableLogs } from "/lib/helper-functions";
-import { hackingLog, HackLogType } from "./logger";
-
-export interface Controller {
-  target: Server,
-  targetIsPrepared: boolean,
-  hosts: Server[],
-  portIndex: number,
-  ports: NetscriptPort[],
-  spacer: number
-}
+import { hackingLog, HackLogType } from "/hacking/logger";
 
 export async function main(ns: NS): Promise<void> {
-  const functionNames: string[] = ['getServerMaxRam'];
+  const functionNames: string[] = ['getServerMaxRam', 'scan'];
   disableLogs(ns, functionNames);
 
-  hackingLog(ns, HackLogType.start);
+  await hackingLog(ns, HackLogType.start);
 
-  const controller: Controller = await init(ns);
-  await deploy(ns, controller);
+  const controller: Controller = new Controller(ns, 100);
+  await controller.start();
 }
 
-async function init(ns: NS): Promise<Controller> {
-  const target: Server = ns.getServer(mostProfitableServer(ns));
-  const hosts: Server[] = getUsableHosts(ns);
-  const controller: Controller = {
-    target: target,
-    targetIsPrepared: targetIsPrepared(target),
-    hosts: hosts,
-    portIndex: 1,
-    ports: [],
-    spacer: 20,
-  };
+export class Controller {
+  ns: NS;
+  target: Target;
+  targetIsPrepared: boolean;
+  hosts: Server[];
+  portIndex: number;
+  ports: NetscriptPort[];
+  spacer: number;
 
-  await prepareTarget(ns, controller);
-  await hackingLog(ns, HackLogType.prepared, controller.target.hostname);
+  prepEnd: number;
 
-  return controller;
-}
-
-async function prepareTarget(ns: NS, controller: Controller): Promise<void> {
-  if (targetIsPrepared(controller.target)) {
-    return;
+  constructor(ns: NS, spacer: number) {
+    this.ns = ns;
+    this.target = new Target(ns, ns.getServer(mostProfitableServer(ns)));
+    this.targetIsPrepared = false;
+    this.hosts = getUsableHosts(this.ns);
+    this.portIndex = 1;
+    this.ports = [];
+    this.spacer = spacer;
+    this.prepEnd = 0;
   }
-  await hackingLog(ns, HackLogType.prepare, controller.target.hostname);
 
-  const tasks: Task[] = createBatch(ns, controller);
-  const prepTasks: Task[] = tasks.slice(2);
+  async start() {
+    await this.init();
 
-  await waitTillEnoughRamAvailable(ns, prepTasks);
-  await dispatchWorkers(ns, prepTasks, controller);
+    await this.run();
+  }
 
-  const prepTime: number = ns.getWeakenTime(controller.target.hostname) + controller.spacer;
-  await ns.sleep(prepTime);
-}
+  // Prepares a server for optimal hacking conditions:
+  // 1. It has the maximum amount of money available 
+  // 2. The security is at a minimum
+  async init(): Promise<void> {
+    await hackingLog(this.ns, HackLogType.prepare, this.target.server.hostname);
 
-function targetIsPrepared(target: Server): boolean {
-  const targetHasMaxMoney: boolean = target.moneyAvailable === target.moneyMax;
-  const targetHasMinSec: boolean = target.hackDifficulty === target.minDifficulty;
-  return targetHasMaxMoney && targetHasMinSec;
-}
+    while (!this.target.isPrepped()) {
+      this.updateHosts();
+      this.dispatchPrepTask()
 
-async function deploy(ns: NS, controller: Controller): Promise<void> {
-  while (true) {
-    await hackingLog(ns, HackLogType.newDeployment);
-    controller.hosts = getUsableHosts(ns);
+      await this.ns.sleep(this.spacer * 2);
+    }
+    this.sleepTillPrepEnd();
 
-    const tasks: Task[] = createBatch(ns, controller);
-    await waitTillEnoughRamAvailable(ns, tasks);
-    await dispatchWorkers(ns, tasks, controller);
+    await hackingLog(this.ns, HackLogType.prepared, this.target.server.hostname);
+  }
 
-    const prepTime: number = ns.getWeakenTime(controller.target.hostname) + controller.spacer * 2;
-    await ns.sleep(prepTime);
+  updateHosts() {
+    this.hosts = getUsableHosts(this.ns);
+  }
+
+  // Prepares a Batch of a single Task,
+  // returns the time it takes to work
+  async dispatchPrepTask(): Promise<void> {
+    const task: Task = this.prepareTask();
+    await this.dispatchBatch([task]);
+
+    const taskTime = this.getTaskTime(task.script);
+    this.updatePrepEndTime(taskTime);
+  }
+
+  async sleepTillPrepEnd() {
+    const sleep = Math.max(this.prepEnd - Date.now() + this.spacer, 0);
+    await this.ns.sleep(sleep);
+  }
+
+  prepareTask(): Task {
+    if (!this.target.moneyIsPrepped()) {
+      // Prepare money on target
+      const growThreads = getGrowThreads(this.ns, this.target);
+      return createTask(this, Scripts.Grow, growThreads);
+    } else {
+      // Prepare security on target
+      const weakenThreads = getMinSecThreads(this.ns, this.target);
+      return createTask(this, Scripts.Weaken, weakenThreads);
+    }
+  }
+
+  getTaskTime(script: string) {
+    const hostname = this.target.server.hostname;
+    let taskTime = 0;
+    if (script == Scripts.Grow) {
+      taskTime = this.ns.getGrowTime(hostname);
+    } else {
+      taskTime = this.ns.getWeakenTime(hostname);
+    }
+    return taskTime;
+  }
+
+  updatePrepEndTime(taskTime: number) {
+    this.prepEnd = Math.max(this.prepEnd, taskTime);
+  }
+
+  // Continously deploy batches
+  async run(): Promise<void> {
+    while (true) {
+      await hackingLog(this.ns, HackLogType.newDeployment);
+      this.deploy();
+
+      const batchDelay = this.spacer * 2;
+      await this.ns.sleep(batchDelay);
+    }
+  }
+
+  async deploy(): Promise<void> {
+    this.updateHosts();
+
+    const tasks: Task[] = createBatch(this.ns, this);
+    await waitTillEnoughRamAvailable(this.ns, tasks);
+    await this.dispatchBatch(tasks);
+
+  }
+
+  async sendTask(task: Task): Promise<void> {
+    const data: string = JSON.stringify(task);
+    const port: NetscriptPort = this.ns.getPortHandle(this.portIndex);
+    port.clear();
+    await port.write(data);
+
+    await hackingLog(this.ns, HackLogType.sendTask, this.portIndex);
+
+    this.ports.push(port);
+    this.portIndex++;
+  }
+
+  async dispatchBatch(batch: Task[]): Promise<void> {
+    if (!batchHasEnoughRam(this.ns, batch)) {
+      reduceThreadAmount(this.ns, batch);
+    }
+
+    for (const task of batch) {
+      this.dispatchWorker(task);
+    }
+
+    this.target.update(batch);
+  }
+
+  async dispatchWorker(task: Task) {
+    if (task.threads > 0) {
+      return;
+    }
+
+    this.ns.run("hacking/tWorker.js", 1, this.portIndex);
+    await this.sendTask(task);
+
+    await hackingLog(this.ns, HackLogType.dispatch, this.portIndex);
   }
 }
 
-async function dispatchWorkers(ns: NS, tasks: Task[], controller: Controller): Promise<void> {
-  for (const task of tasks) {
-    ns.run("hacking/tWorker.js", 1, controller.portIndex);
-    await hackingLog(ns, HackLogType.dispatch, controller.portIndex);
-
-    sendTask(ns, task, controller);
-  }
-}
-
-async function sendTask(ns: NS, task: Task, controller: Controller): Promise<void> {
-  const port: NetscriptPort = ns.getPortHandle(controller.portIndex);
-  port.clear();
-
-  const data: string = JSON.stringify(task);
-  await port.write(data);
-  hackingLog(ns, HackLogType.sendTask, controller.portIndex);
-
-  controller.ports.push(port);
-  controller.portIndex++;
-
-}
