@@ -1,19 +1,26 @@
 import { NS } from "@ns";
 import { Target } from "/hacking/target";
+import { Scripts } from "/Scripts";
 
-export function getThreadsForAllScripts(ns: NS, target: Target) {
-  const hackThreads = getHackThreads(ns, target, 10);
+export function getThreadsForAllScripts(
+  ns: NS,
+  target: Target,
+  stealPercent: number,
+): number[] {
+  const hackThreads = getHackThreads(ns, target, stealPercent);
   const hackWeakenThreads = Math.ceil(hackThreads / 25); // 1x weaken == 25x hacks
+  target.update(Scripts.Weaken, hackWeakenThreads);
 
   const growThreads = getGrowThreads(ns, target);
   const growWeakenThreads = Math.ceil(growThreads / 12.5); // 1x grow == 12.5x hacks
+  target.update(Scripts.Weaken, growWeakenThreads);
 
   return [hackThreads, hackWeakenThreads, growThreads, growWeakenThreads];
 }
 
 // Returns the amount of threads necessary,
 // to grow money to maximum on a provided target
-function getHackThreads(ns: NS, target: Target, stealPercent: number) {
+function getHackThreads(ns: NS, target: Target, stealPercent: number): number {
   let hackPercent = 0;
   if (ns.fileExists("Formulas.exe", "home")) {
     const player = ns.getPlayer();
@@ -22,16 +29,17 @@ function getHackThreads(ns: NS, target: Target, stealPercent: number) {
   } else {
     hackPercent = getHackEffect(ns, target);
   }
-  const hackThreads = stealPercent / hackPercent;
+  const hackThreads = Math.floor(stealPercent / hackPercent);
 
-  return Math.floor(hackThreads);
+  target.update(Scripts.Hacking, hackThreads);
+  return hackThreads;
 }
 
 // Calculates the percent of money stolen by hack in decimal form,
 // based on a provided target
 // Read source code for exact formula:
 // https://github.com/bitburner-official/bitburner-src/blob/dev/src/Hacking.ts
-function getHackEffect(ns: NS, target: Target) {
+function getHackEffect(ns: NS, target: Target): number {
   const hostname = target.server.hostname;
 
   const hackDifficulty = target.sec;
@@ -45,30 +53,37 @@ function getHackEffect(ns: NS, target: Target) {
 
   const balanceFactor = 240;
   const percentMoneyStolen =
-    (difficultyMultiplier * skillMultiplier * hackStealMultiplier) / balanceFactor;
+    (difficultyMultiplier * skillMultiplier * hackStealMultiplier) /
+    balanceFactor;
 
   return clamp(percentMoneyStolen, 0, 1);
 }
 
 // Returns the amount of threads necessary,
 // to grow money to maximum on a provided target
-export function getGrowThreads(ns: NS, target: Target) {
+export function getGrowThreads(ns: NS, target: Target): number {
   const maxMoney = target.maxMoney;
   const money = target.money;
 
   let growThreads = 0;
   if (ns.fileExists("Formulas.exe")) {
     const predictedServer = createMockServer(ns, target);
-    growThreads = ns.formulas.hacking.growThreads(predictedServer, ns.getPlayer(), maxMoney);
+    growThreads = ns.formulas.hacking.growThreads(
+      predictedServer,
+      ns.getPlayer(),
+      maxMoney,
+    );
   } else {
     const multiplier = maxMoney / Math.max(money, 1);
     growThreads = growthAnalyzeDynamic(ns, target, multiplier);
   }
+  growThreads = Math.ceil(growThreads);
 
-  return Math.ceil(growThreads);// Only whole threads exist
+  target.update(Scripts.Grow, growThreads);
+  return growThreads; // Only whole threads exist
 }
 
-function clamp(val: number, min: number, max: number) {
+function clamp(val: number, min: number, max: number): number {
   const clampedVal = Math.min(max, Math.max(min, val));
   return clampedVal;
 }
@@ -89,7 +104,11 @@ function createMockServer(ns: NS, target: Target) {
 // Calculates growth threads based on provided target
 // Read source code for exact formula:
 // https://github.com/bitburner-official/bitburner-src/blob/dev/src/Server/ServerHelpers.ts#L6
-function growthAnalyzeDynamic(ns: NS, target: Target, multiplier: number) {
+function growthAnalyzeDynamic(
+  ns: NS,
+  target: Target,
+  multiplier: number,
+): number {
   const hostname = target.server.hostname;
   const hackDifficulty = ns.getServerSecurityLevel(hostname);
   const baseGrowthRate = 1.003;
@@ -100,16 +119,15 @@ function growthAnalyzeDynamic(ns: NS, target: Target, multiplier: number) {
   const serverGrowthPercent = ns.getServerGrowth(hostname) / 100;
 
   const growMultiplier = ns.getPlayer().mults.hacking_grow;
-  const threads = Math.log(multiplier) /
-    (Math.log(adjustedGrowthRate) *
-      growMultiplier *
-      serverGrowthPercent);
+  const threads =
+    Math.log(multiplier) /
+    (Math.log(adjustedGrowthRate) * growMultiplier * serverGrowthPercent);
   return threads;
 }
 
 // Returns the amount of threads necessary,
 // to weaken a server to minimum Security
-export function getMinSecThreads(ns: NS, target: Target) {
+export function getMinSecThreads(ns: NS, target: Target): number {
   const hostname = target.server.hostname;
   const minSec = ns.getServerMinSecurityLevel(hostname);
   const sec = target.sec;
@@ -119,8 +137,11 @@ export function getMinSecThreads(ns: NS, target: Target) {
   return Math.ceil(weakenThreads); // Only whole threads exist
 }
 
-export function getMaxPossibleThreads(ns: NS, script: string,
-  hostname: string): number {
+export function getMaxPossibleThreads(
+  ns: NS,
+  script: string,
+  hostname: string,
+): number {
   const scriptRamCost = ns.getScriptRam(script);
 
   const maxRam = ns.getServerMaxRam(hostname);

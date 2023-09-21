@@ -2,14 +2,14 @@ import { NS, Server } from "@ns";
 import { searchServers } from "/lib/searchServers";
 
 export async function main(ns: NS): Promise<void> {
-  ns.tprint(mostProfitableServer(ns));
+  ns.tprint(getMostProfitableServer(ns));
 }
 
-export function mostProfitableServer(ns: NS): string {
+export function getMostProfitableServer(ns: NS): Server {
   const hackableServers: Server[] = getHackableServers(ns);
   const mostProfitableServer = findMostProfitableServer(hackableServers);
 
-  return mostProfitableServer.hostname;
+  return mostProfitableServer;
 }
 
 function findMostProfitableServer(hackableServers: Server[]): Server {
@@ -22,10 +22,13 @@ function findMostProfitableServer(hackableServers: Server[]): Server {
 }
 
 function getHackableServers(ns: NS): Server[] {
-  const servers: Server[] = searchServers(ns, "home")
-    .map(serverName => ns.getServer(serverName))
-    .filter(server => !(server.requiredHackingSkill === undefined))
-    .filter(server => server.requiredHackingSkill! <= ns.getPlayer().skills.hacking);
+  const homeServer = ns.getServer("home");
+  const servers: Server[] = searchServers(ns, homeServer)
+    .filter((server) => !(server.requiredHackingSkill === undefined))
+    .filter(
+      (server) =>
+        server.requiredHackingSkill ?? 0 <= ns.getPlayer().skills.hacking,
+    );
   return servers;
 }
 
@@ -52,9 +55,5 @@ function canMakeProfitOn(server: Server): boolean {
   const serverHasMoney = server.moneyMax !== undefined;
   const serverHasSecurity = server.minDifficulty !== undefined;
 
-  return (
-    server.hasAdminRights &&
-    serverHasMoney &&
-    serverHasSecurity
-  );
+  return server.hasAdminRights && serverHasMoney && serverHasSecurity;
 }

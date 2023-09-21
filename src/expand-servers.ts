@@ -1,72 +1,74 @@
-import { NS } from "@ns";
+import { NS, Server } from "@ns";
+import { getServersFiltered } from "./lib/searchServers";
 
-const SERVER_BASE_NAME: string = "pserv-";
+const SERVER_BASE_NAME = "pserv-";
 
 /** @param {NS} ns */
-export async function main(ns: NS) {
+export async function main(ns: NS): Promise<void> {
   ns.disableLog("sleep");
   ns.disableLog("getServerMoneyAvailable");
 
-  const ram = 2;
-  await purchaseAllServers(ns, ram);
-  await upgradeAllServers(ns, ram);
+  await purchaseAllServers(ns);
+
+  const filters: RegExp[] = getRegexFor(["home", "pserv-[0-9]*"]);
+  const servers = getServersFiltered(ns, filters);
+  await upgradeRoutine(ns, servers);
 }
 
-async function purchaseAllServers(ns: NS, ram: number) {
+function getRegexFor(strings: string[]): RegExp[] {
+  const filters: RegExp[] = strings.map((string) => new RegExp(string));
+  return filters;
+}
+
+async function purchaseAllServers(ns: NS): Promise<void> {
   let i = 0;
   while (i < ns.getPurchasedServerLimit()) {
     const serverName = SERVER_BASE_NAME + i;
-    ns.print(`Trying to purchase server ${serverName}`);
     if (ns.serverExists(serverName)) {
-      ns.print(`Server ${serverName} already exist.`);
       i++;
       continue;
-    }
-
-    if (canPurchaseServer(ns, ram)) {
-      ns.purchaseServer(serverName, ram);
-      ns.print(`Purchased server ${serverName}`);
-      i++;
     } else {
-      ns.print(`Coudn't purchase server ${serverName}`);
+      await purchaseServer(ns, serverName);
+      i++;
     }
 
     await ns.sleep(1000);
   }
 }
 
-async function upgradeAllServers(ns: NS, ram: number) {
-  for (let exponent = 1; exponent < 20; exponent++) {
-    const ramUpgradeSize = Math.pow(ram, exponent);
-    await upgradeServer(ns, ramUpgradeSize);
-  }
-}
+// Will wait till the player can afford to purchase a server,
+// and purchases it afterwards
+async function purchaseServer(ns: NS, serverName: string): Promise<void> {
+  const ram = 2; // Use cheapest option, server will be upgraded afterwards
 
-async function upgradeServer(ns: NS, ramUpgradeSize: number) {
-  let i = 0;
-  while (i < ns.getPurchasedServerLimit()) {
-    const serverName = SERVER_BASE_NAME + i;
-    ns.print(`Trying to upgrade ${serverName} to ${ramUpgradeSize}...`);
-    if (canUpgradeServer(ns, serverName, ramUpgradeSize)) {
-      ns.upgradePurchasedServer(serverName, ramUpgradeSize);
-      ns.print(`Upgraded server ${serverName} to ${ramUpgradeSize}. ram`);
-      i++;
-    } else {
-      ns.print(`Coudn't upgrade server ${serverName} to ${ramUpgradeSize} ram`);
-    }
-
+  // Wait till the server is purchasable
+  while (!canPurchaseServer(ns, ram)) {
     await ns.sleep(1000);
   }
+
+  ns.purchaseServer(serverName, ram);
 }
 
-function canPurchaseServer(ns: NS, ram: number) {
+function canPurchaseServer(ns: NS, ram: number): boolean {
   const availableMoney = ns.getServerMoneyAvailable("home");
   const serverPrice = ns.getPurchasedServerCost(ram);
   return availableMoney > serverPrice;
 }
 
-function canUpgradeServer(ns: NS, serverName: string, ram: number) {
-  const availableMoney = ns.getServerMoneyAvailable("home");
-  const upgradePrice = ns.getPurchasedServerUpgradeCost(serverName, ram);
-  return availableMoney > upgradePrice;
+async function upgradeRoutine(ns: NS, servers: Server[]): Promise<void> {
+  while (true) {
+    upgradeServers(ns, servers);
+    await ns.sleep(1000);
+  }
+}
+
+function upgradeServers(ns: NS, servers: Server[]): void {
+  servers.forEach((server) => {
+    tryUpgradeServer(ns, server);
+  });
+}
+
+function tryUpgradeServer(ns: NS, server: Server): void {
+  const ramUpgradeSize = server.maxRam ** 2;
+  ns.upgradePurchasedServer(server.hostname, ramUpgradeSize);
 }

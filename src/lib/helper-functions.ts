@@ -1,9 +1,9 @@
-import { NS } from "../../NetscriptDefinitions";
+import { NS, Server } from "../../NetscriptDefinitions";
 
 export function calculateThreadAmount(
   ns: NS,
   script: string,
-  hostname: string
+  hostname: string,
 ): number {
   const scriptRamCost = ns.getScriptRam(script);
   const availableRamOnHost =
@@ -16,15 +16,15 @@ export function calculateThreadAmount(
 export async function waitUntilScriptFinished(
   ns: NS,
   pid: number,
-  sleepIntervall = 1000
+  sleepIntervall = 1000,
 ): Promise<void> {
   while (ns.isRunning(pid)) {
     await ns.sleep(sleepIntervall);
   }
 }
 
-export function hackLevelEnough(ns: NS, hostname: string): boolean {
-  const requiredHackingLevel = ns.getServerRequiredHackingLevel(hostname);
+export function hackLevelEnough(ns: NS, host: Server): boolean {
+  const requiredHackingLevel = ns.getServerRequiredHackingLevel(host.hostname);
   const playerHackingLevel = ns.getHackingLevel();
   return playerHackingLevel >= requiredHackingLevel;
 }
