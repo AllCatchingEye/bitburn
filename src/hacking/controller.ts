@@ -1,16 +1,20 @@
-import { NetscriptPort, NS, Server } from "@ns"
-import { Scripts } from "/lib/batch-helper";
+import { NetscriptPort, NS, Server } from "@ns";
+import { Scripts } from "/Scripts";
 import { Target } from "/hacking/target";
 import { Task, createBatch, createTask } from "/hacking/task";
-import { batchHasEnoughRam, reduceThreadAmount, waitTillEnoughRamAvailable } from "/lib/ram-helper";
+import {
+  batchHasEnoughRam,
+  reduceThreadAmount,
+  waitTillEnoughRamAvailable,
+} from "/lib/ram-helper";
 import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
 import { getUsableHosts } from "/lib/searchServers";
-import { mostProfitableServer } from "/lib/profit-functions";
+import { getMostProfitableServer } from "/lib/profit-functions";
 import { disableLogs } from "/lib/helper-functions";
 import { hackingLog, HackLogType } from "/hacking/logger";
 
 export async function main(ns: NS): Promise<void> {
-  const functionNames: string[] = ['getServerMaxRam', 'scan'];
+  const functionNames: string[] = ["getServerMaxRam", "scan"];
   disableLogs(ns, functionNames);
 
   await hackingLog(ns, HackLogType.start);
@@ -27,45 +31,49 @@ export class Controller {
   portIndex: number;
   ports: NetscriptPort[];
   spacer: number;
+  stealPercent: number;
 
   prepEnd: number;
 
   constructor(ns: NS, spacer: number) {
     this.ns = ns;
-    this.target = new Target(ns, ns.getServer(mostProfitableServer(ns)));
+    this.target = new Target(this.ns, getMostProfitableServer(this.ns));
     this.targetIsPrepared = false;
     this.hosts = getUsableHosts(this.ns);
     this.portIndex = 1;
     this.ports = [];
     this.spacer = spacer;
     this.prepEnd = 0;
+    this.stealPercent = 0.25;
   }
 
-  async start() {
+  async start(): Promise<void> {
     await this.init();
 
     await this.run();
   }
 
   // Prepares a server for optimal hacking conditions:
-  // 1. It has the maximum amount of money available 
+  // 1. It has the maximum amount of money available
   // 2. The security is at a minimum
   async init(): Promise<void> {
     await hackingLog(this.ns, HackLogType.prepare, this.target.server.hostname);
 
     while (!this.target.isPrepped()) {
-      this.updateHosts();
-      this.dispatchPrepTask()
+      this.target.checkForNewTarget();
+      this.hosts = getUsableHosts(this.ns);
+
+      await this.dispatchPrepTask();
 
       await this.ns.sleep(this.spacer * 2);
     }
-    this.sleepTillPrepEnd();
+    await this.sleepTillPrepEnd();
 
-    await hackingLog(this.ns, HackLogType.prepared, this.target.server.hostname);
-  }
-
-  updateHosts() {
-    this.hosts = getUsableHosts(this.ns);
+    await hackingLog(
+      this.ns,
+      HackLogType.prepared,
+      this.target.server.hostname,
+    );
   }
 
   // Prepares a Batch of a single Task,
@@ -78,8 +86,11 @@ export class Controller {
     this.updatePrepEndTime(taskTime);
   }
 
-  async sleepTillPrepEnd() {
-    const sleep = Math.max(this.prepEnd - Date.now() + this.spacer, 0);
+  async sleepTillPrepEnd(): Promise<void> {
+    const sleep = Math.max(
+      this.prepEnd - Date.now() + this.spacer,
+      this.spacer,
+    );
     await this.ns.sleep(sleep);
   }
 
@@ -95,7 +106,7 @@ export class Controller {
     }
   }
 
-  getTaskTime(script: string) {
+  getTaskTime(script: string): number {
     const hostname = this.target.server.hostname;
     let taskTime = 0;
     if (script == Scripts.Grow) {
@@ -106,7 +117,7 @@ export class Controller {
     return taskTime;
   }
 
-  updatePrepEndTime(taskTime: number) {
+  updatePrepEndTime(taskTime: number): void {
     this.prepEnd = Math.max(this.prepEnd, taskTime);
   }
 
@@ -114,7 +125,7 @@ export class Controller {
   async run(): Promise<void> {
     while (true) {
       await hackingLog(this.ns, HackLogType.newDeployment);
-      this.deploy();
+      await this.deploy();
 
       const batchDelay = this.spacer * 2;
       await this.ns.sleep(batchDelay);
@@ -122,12 +133,9 @@ export class Controller {
   }
 
   async deploy(): Promise<void> {
-    this.updateHosts();
-
-    const tasks: Task[] = createBatch(this.ns, this);
+    const tasks: Task[] = createBatch(this.ns, this, this.stealPercent);
     await waitTillEnoughRamAvailable(this.ns, tasks);
     await this.dispatchBatch(tasks);
-
   }
 
   async sendTask(task: Task): Promise<void> {
@@ -148,14 +156,12 @@ export class Controller {
     }
 
     for (const task of batch) {
-      this.dispatchWorker(task);
+      await this.dispatchWorker(task);
     }
-
-    this.target.update(batch);
   }
 
-  async dispatchWorker(task: Task) {
-    if (task.threads > 0) {
+  async dispatchWorker(task: Task): Promise<void> {
+    if (task.threads <= 0) {
       return;
     }
 
@@ -165,4 +171,3 @@ export class Controller {
     await hackingLog(this.ns, HackLogType.dispatch, this.portIndex);
   }
 }
-
