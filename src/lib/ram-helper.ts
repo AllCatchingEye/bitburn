@@ -2,7 +2,7 @@ import { NS, Server } from "@ns";
 import { Task } from "/hacking/task";
 import { Batch, isBatch } from "/hacking/batch";
 import { getUsableHosts } from "/lib/searchServers";
-import { shrinkThreads } from "./thread-utils";
+import { shrinkThreads } from "/lib/thread-utils";
 
 export function calculateAvailableRam(ns: NS): number {
   const hosts = getUsableHosts(ns);

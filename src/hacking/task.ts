@@ -1,6 +1,6 @@
 import { Server } from "@ns";
-import { Scripts, getBatchScripts } from "/Scripts";
-import { Batch } from "./batch";
+import { hackingScripts, getBatchScripts } from "/scripts/Scripts";
+import { Batch } from "/hacking/batch";
 import { Controller } from "/hacking/controller";
 import { calculateThreads, calculateDelays } from "/lib/thread-utils";
 
@@ -55,13 +55,13 @@ export function createTask(
 export function calculateTaskTime(ns: NS, task: Task): number {
   let taskTime = 0;
   switch (task.script) {
-    case Scripts.Grow:
+    case hackingScripts.Grow:
       taskTime = ns.getGrowTime(task.target.hostname);
       break;
-    case Scripts.Weaken:
+    case hackingScripts.Weaken:
       taskTime = ns.getWeakenTime(task.target.hostname);
       break;
-    case Scripts.Hacking:
+    case hackingScripts.Hacking:
       taskTime = ns.getHackTime(task.target.hostname);
       break;
     default:

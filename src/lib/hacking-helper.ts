@@ -2,7 +2,7 @@ import { NS } from "@ns";
 import { Batch, isBatch } from "/hacking/batch";
 import { Task } from "/hacking/task";
 import { getMaxRunnableThreads } from "/lib/thread-utils";
-import { waitForRam } from "./ram-helper";
+import { waitForRam } from "/lib/ram-helper";
 
 export function distributeScript(
   ns: NS,
