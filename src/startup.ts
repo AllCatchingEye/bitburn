@@ -45,12 +45,12 @@ function hasEnoughMoney(ns: NS) {
 }
 
 function startWatcher(ns: NS) {
-  const script = "hacknet-nodes-upgrader.js";
+  const script = "watcher.js";
   startScript(ns, script);
 }
 
 function startHacknet(ns: NS) {
-  const script = "watcher.js";
+  const script = "hacknet-nodes-upgrader.js";
   startScript(ns, script);
 }
 
