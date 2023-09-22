@@ -1,28 +1,34 @@
 import { NS } from "@ns";
-import { getTotalRam } from "./lib/ram-helper";
 
 /**
  * Startup routine for scripts
  * @param {NS} ns - Mandatory to access netscript functions
  */
-export async function main(ns: NS) {
-  const host = "home";
+export async function main(ns: NS): Promise<void> {
+  while (true) {
+    startCracker(ns);
 
-  startServerExpander(ns);
+    startHacking(ns);
 
-  if (!ns.scriptRunning("cracker/server-cracker.js", host)) {
-    ns.run("/cracker/server-cracker.js");
+    startServerExpander(ns);
+
+    startWatcher(ns);
+
+    // Not profitable for now
+    //startHacknet(ns);
+
+    await ns.sleep(1000);
   }
+}
 
-  startHacking(ns);
+function startCracker(ns: NS) {
+  const script = "cracker/server-cracker.js";
+  startScript(ns, script);
+}
 
-  if (!ns.scriptRunning("hacknet-nodes-upgrader.js", host)) {
-    //ns.run("hacknet-nodes-upgrader.js");
-  }
-
-  if (!ns.scriptRunning("watcher.js", host)) {
-    ns.run("watcher.js");
-  }
+function startHacking(ns: NS) {
+  const script = "hacking/controller.js";
+  startScript(ns, script);
 }
 
 function startServerExpander(ns: NS) {
@@ -32,30 +38,24 @@ function startServerExpander(ns: NS) {
   }
 }
 
-function startHacking(ns: NS) {
-  const script = decideHackerScript(ns);
-  if (!ns.isRunning(script)) {
-    ns.run(script);
-  }
-}
-
-function decideHackerScript(ns: NS) {
-  const totalRam = getTotalRam(ns);
-  let script = "";
-  const controller = "/hacking/controller.js";
-  const earlyHack = "/hacking/early-game-hack.js";
-  if (totalRam > 512) {
-    script = controller;
-    ns.scriptKill(earlyHack, "home");
-  } else {
-    script = earlyHack;
-    ns.scriptKill(controller, "home");
-  }
-  return script;
-}
-
 function hasEnoughMoney(ns: NS) {
   const minMoney = 440_000;
   const money = ns.getServerMoneyAvailable("home");
   return money > minMoney;
+}
+
+function startWatcher(ns: NS) {
+  const script = "hacknet-nodes-upgrader.js";
+  startScript(ns, script);
+}
+
+function startHacknet(ns: NS) {
+  const script = "watcher.js";
+  startScript(ns, script);
+}
+
+function startScript(ns: NS, script: string) {
+  if (!ns.scriptRunning(script, "home")) {
+    ns.run(script);
+  }
 }
