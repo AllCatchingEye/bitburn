@@ -1,8 +1,7 @@
 import { NS, Server } from "../../NetscriptDefinitions";
 import { canOpenAllRequiredPorts, openPorts } from "/cracker/Ports";
-import { hackLevelEnough } from "/lib/helper-functions";
 import { searchServers } from "/lib/searchServers";
-import { getScriptsList } from "/Scripts";
+import { getScriptsList } from "/scripts/Scripts";
 
 export async function main(ns: NS): Promise<void> {
   disableLogs(ns);
@@ -44,6 +43,12 @@ function canCrack(ns: NS, host: Server) {
 
   const canCrack = canHack && isNotCracked && canOpenPorts;
   return canCrack;
+}
+
+function hackLevelEnough(ns: NS, host: Server): boolean {
+  const requiredHackingLevel = ns.getServerRequiredHackingLevel(host.hostname);
+  const playerHackingLevel = ns.getHackingLevel();
+  return playerHackingLevel >= requiredHackingLevel;
 }
 
 function serverCracked(ns: NS, server: Server) {

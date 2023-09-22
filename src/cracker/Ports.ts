@@ -42,7 +42,7 @@ function getPortPrograms(): string[] {
  * @param {NS} ns - Mandatory to access netscript functions
  * @param {Server} host - Host for which the ports will be opened
  */
-export function openPorts(ns: NS, host: Server): void {
+export function openPorts(ns: NS, host: Server): boolean {
   ns.print(`Initilizing host ${host} for scripts...`);
 
   if (ns.fileExists("BruteSSH.exe")) {
@@ -64,4 +64,10 @@ export function openPorts(ns: NS, host: Server): void {
   if (ns.fileExists("SQLInject.exe")) {
     ns.sqlinject(host.hostname);
   }
+
+  // Get root rights
+  ns.nuke(host.hostname);
+
+  // Indicate if rooting was successfull
+  return host.hasAdminRights;
 }
