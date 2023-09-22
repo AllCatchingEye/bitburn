@@ -1,6 +1,8 @@
-import { NS, Server } from "@ns";
+import { Server } from "@ns";
+import { Scripts, getBatchScripts } from "/Scripts";
+import { Batch } from "./batch";
 import { Controller } from "/hacking/controller";
-import { getThreadsForAllScripts } from "/lib/thread-utils";
+import { calculateThreads, calculateDelays } from "/lib/thread-utils";
 
 export interface Task {
   target: Server;
@@ -10,6 +12,28 @@ export interface Task {
   delay: number;
 }
 
+export function isTask(job: Batch | Task): job is Batch {
+  const script = (job as Task).script;
+  const threads = (job as Task).threads;
+  const delay = (job as Task).delay;
+
+  return script !== undefined && threads !== undefined && delay !== undefined;
+}
+
+export function createBatchTasks(ns: NS, controller: Controller): Task[] {
+  const scripts: string[] = getBatchScripts();
+  const threads: number[] = calculateThreads(ns, controller);
+  const delays: number[] = calculateDelays(ns, controller);
+
+  const tasks: Task[] = [];
+  for (let i = 0; i < scripts.length; i++) {
+    const task = createTask(controller, scripts[i], threads[i], delays[i]);
+    tasks.push(task);
+  }
+
+  return tasks;
+}
+
 export function createTask(
   controller: Controller,
   script: string,
@@ -17,7 +41,7 @@ export function createTask(
   delay = 0,
 ): Task {
   const target: Server = controller.target.server;
-  const hosts: Server[] = controller.hosts;
+  const hosts: Server[] = controller.usableServers;
   const task = {
     target: target,
     hosts: hosts,
@@ -28,70 +52,21 @@ export function createTask(
   return task;
 }
 
-export function createBatch(
-  ns: NS,
-  controller: Controller,
-  stealPercent: number,
-): Task[] {
-  const [hackThreads, weaken1Threads, growThreads, weaken2Threads] =
-    getThreadsForAllScripts(ns, controller.target, stealPercent);
+export function calculateTaskTime(ns: NS, task: Task): number {
+  let taskTime = 0;
+  switch (task.script) {
+    case Scripts.Grow:
+      taskTime = ns.getGrowTime(task.target.hostname);
+      break;
+    case Scripts.Weaken:
+      taskTime = ns.getWeakenTime(task.target.hostname);
+      break;
+    case Scripts.Hacking:
+      taskTime = ns.getHackTime(task.target.hostname);
+      break;
+    default:
+      break;
+  }
 
-  const [hackDelay, weaken1Delay, growDelay, weaken2Delay] = calculateDelays(
-    ns,
-    controller.target.server,
-    controller.spacer,
-  );
-
-  // To negate the security increase by hack, weaken should be startet first
-  // The rest can be startet simultanously with a slight delay between them because they
-  // finish in order
-  const hack: Task = createTask(
-    controller,
-    "/hacking/hack.js",
-    hackThreads,
-    hackDelay,
-  );
-  const weaken1: Task = createTask(
-    controller,
-    "/hacking/weaken.js",
-    weaken1Threads,
-    weaken1Delay,
-  );
-  const grow: Task = createTask(
-    controller,
-    "/hacking/grow.js",
-    growThreads,
-    growDelay,
-  );
-  const weaken2: Task = createTask(
-    controller,
-    "/hacking/weaken.js",
-    weaken2Threads,
-    weaken2Delay,
-  );
-  const tasks: Task[] = [hack, weaken1, grow, weaken2];
-
-  return tasks;
-}
-
-function calculateDelays(
-  ns: NS,
-  target: Server,
-  spacer: number,
-): [number, number, number, number] {
-  const hackTime = ns.getHackTime(target.hostname);
-  const growTime = ns.getGrowTime(target.hostname);
-  const weakenTime = ns.getWeakenTime(target.hostname);
-
-  // Calculate delay based on weaken1
-  //  H:    =     => W - H - S
-  // W1: =====    => 0
-  //  G:   ====   => W - G + S
-  // W2:   =====  => S * 2
-  const hackDelay = weakenTime - hackTime - spacer;
-  const weaken1Delay = 0;
-  const growDelay = weakenTime - growTime + spacer;
-  const weaken2Delay = spacer * 2;
-
-  return [hackDelay, weaken1Delay, growDelay, weaken2Delay];
+  return taskTime;
 }

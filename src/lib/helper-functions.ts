@@ -23,12 +23,6 @@ export async function waitUntilScriptFinished(
   }
 }
 
-export function hackLevelEnough(ns: NS, host: Server): boolean {
-  const requiredHackingLevel = ns.getServerRequiredHackingLevel(host.hostname);
-  const playerHackingLevel = ns.getHackingLevel();
-  return playerHackingLevel >= requiredHackingLevel;
-}
-
 export function disableLogs(ns: NS, functionNames: string[]): void {
   functionNames.forEach((functionName) => {
     ns.disableLog(functionName);

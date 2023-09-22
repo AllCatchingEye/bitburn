@@ -1,6 +1,6 @@
 import { NS, Player, Server } from "@ns";
 import { getMostProfitableServer } from "/lib/profit-functions";
-import { Scripts } from "/Scripts";
+import { hackingScripts } from "/scripts/Scripts";
 
 export class Target {
   ns: NS;
@@ -11,9 +11,9 @@ export class Target {
   maxMoney: number;
   money: number;
 
-  constructor(ns: NS, server: Server) {
+  constructor(ns: NS) {
     this.ns = ns;
-    this.server = server;
+    this.server = getMostProfitableServer(this.ns);
     this.player = this.ns.getPlayer();
     this.minSec = this.ns.getServerMinSecurityLevel(this.server.hostname);
     this.sec = this.ns.getServerSecurityLevel(this.server.hostname);
@@ -21,7 +21,7 @@ export class Target {
     this.maxMoney = this.ns.getServerMaxMoney(this.server.hostname);
   }
 
-  update(script: Scripts, threads: number): void {
+  update(script: hackingScripts, threads: number): void {
     this.determineUpdateTypeOf(script, threads);
   }
 
@@ -47,15 +47,15 @@ export class Target {
     this.money = this.server.moneyAvailable ?? 0;
   }
 
-  determineUpdateTypeOf(script: Scripts, threads: number): void {
+  determineUpdateTypeOf(script: hackingScripts, threads: number): void {
     switch (script) {
-      case Scripts.Hacking:
+      case hackingScripts.Hacking:
         this.hackUpdate(threads);
         break;
-      case Scripts.Grow:
+      case hackingScripts.Grow:
         this.growUpdate(threads);
         break;
-      case Scripts.Weaken:
+      case hackingScripts.Weaken:
         this.weakenUpdate(threads);
         break;
       default:

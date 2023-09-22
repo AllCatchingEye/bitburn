@@ -1,23 +1,16 @@
-import { NetscriptPort, NS, Server } from "@ns";
-import { Scripts } from "/Scripts";
+import { NS, Server } from "@ns";
+import { hackingScripts } from "/scripts/Scripts";
 import { Target } from "/hacking/target";
-import { Task, createBatch, createTask } from "/hacking/task";
-import {
-  batchHasEnoughRam,
-  reduceThreadAmount,
-  waitTillEnoughRamAvailable,
-} from "/lib/ram-helper";
+import { Task, createTask, calculateTaskTime } from "/hacking/task";
 import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
 import { getUsableHosts } from "/lib/searchServers";
-import { getMostProfitableServer } from "/lib/profit-functions";
 import { disableLogs } from "/lib/helper-functions";
-import { hackingLog, HackLogType } from "/hacking/logger";
+import { createBatch } from "/hacking/batch";
+import { deploy } from "/lib/hacking-helper";
 
 export async function main(ns: NS): Promise<void> {
   const functionNames: string[] = ["getServerMaxRam", "scan"];
   disableLogs(ns, functionNames);
-
-  await hackingLog(ns, HackLogType.start);
 
   const controller: Controller = new Controller(ns, 100);
   await controller.start();
@@ -27,147 +20,76 @@ export class Controller {
   ns: NS;
   target: Target;
   targetIsPrepared: boolean;
-  hosts: Server[];
-  portIndex: number;
-  ports: NetscriptPort[];
-  spacer: number;
+  usableServers: Server[];
+  taskDelay: number;
   stealPercent: number;
-
-  prepEnd: number;
 
   constructor(ns: NS, spacer: number) {
     this.ns = ns;
-    this.target = new Target(this.ns, getMostProfitableServer(this.ns));
+    this.target = new Target(this.ns);
     this.targetIsPrepared = false;
-    this.hosts = getUsableHosts(this.ns);
-    this.portIndex = 1;
-    this.ports = [];
-    this.spacer = spacer;
-    this.prepEnd = 0;
+    this.usableServers = getUsableHosts(this.ns);
+    this.taskDelay = spacer;
     this.stealPercent = 0.25;
   }
 
   async start(): Promise<void> {
-    await this.init();
+    await this.prepareTarget();
 
-    await this.run();
+    await this.runHackingBatches();
   }
 
   // Prepares a server for optimal hacking conditions:
   // 1. It has the maximum amount of money available
   // 2. The security is at a minimum
-  async init(): Promise<void> {
-    await hackingLog(this.ns, HackLogType.prepare, this.target.server.hostname);
-
+  async prepareTarget(): Promise<void> {
+    let prepEnd = 0;
     while (!this.target.isPrepped()) {
+      this.usableServers = getUsableHosts(this.ns);
+
+      const task: Task = this.prepareTask();
+      await deploy(this.ns, task);
+
+      // Short delay between tasks, also necessary for loops in bitburn
+      const taskTime = calculateTaskTime(this.ns, task);
+      prepEnd = Math.max(prepEnd, taskTime);
+
+      await this.ns.sleep(this.taskDelay * 2);
+
       this.target.checkForNewTarget();
-      this.hosts = getUsableHosts(this.ns);
-
-      await this.dispatchPrepTask();
-
-      await this.ns.sleep(this.spacer * 2);
     }
-    await this.sleepTillPrepEnd();
 
-    await hackingLog(
-      this.ns,
-      HackLogType.prepared,
-      this.target.server.hostname,
-    );
-  }
-
-  // Prepares a Batch of a single Task,
-  // returns the time it takes to work
-  async dispatchPrepTask(): Promise<void> {
-    const task: Task = this.prepareTask();
-    await this.dispatchBatch([task]);
-
-    const taskTime = this.getTaskTime(task.script);
-    this.updatePrepEndTime(taskTime);
-  }
-
-  async sleepTillPrepEnd(): Promise<void> {
     const sleep = Math.max(
-      this.prepEnd - Date.now() + this.spacer,
-      this.spacer,
+      prepEnd - Date.now() + this.taskDelay,
+      this.taskDelay,
     );
     await this.ns.sleep(sleep);
   }
 
   prepareTask(): Task {
+    let script = "";
+    let threads = 0;
     if (!this.target.moneyIsPrepped()) {
       // Prepare money on target
-      const growThreads = getGrowThreads(this.ns, this.target);
-      return createTask(this, Scripts.Grow, growThreads);
+      script = hackingScripts.Grow;
+      threads = getGrowThreads(this.ns, this.target);
     } else {
       // Prepare security on target
-      const weakenThreads = getMinSecThreads(this.ns, this.target);
-      return createTask(this, Scripts.Weaken, weakenThreads);
+      script = hackingScripts.Weaken;
+      threads = getMinSecThreads(this.ns, this.target);
     }
-  }
 
-  getTaskTime(script: string): number {
-    const hostname = this.target.server.hostname;
-    let taskTime = 0;
-    if (script == Scripts.Grow) {
-      taskTime = this.ns.getGrowTime(hostname);
-    } else {
-      taskTime = this.ns.getWeakenTime(hostname);
-    }
-    return taskTime;
-  }
-
-  updatePrepEndTime(taskTime: number): void {
-    this.prepEnd = Math.max(this.prepEnd, taskTime);
+    const task: Task = createTask(this, script, threads);
+    return task;
   }
 
   // Continously deploy batches
-  async run(): Promise<void> {
+  async runHackingBatches(): Promise<void> {
     while (true) {
-      await hackingLog(this.ns, HackLogType.newDeployment);
-      await this.deploy();
+      const batch = createBatch(this.ns, this);
+      await deploy(this.ns, batch);
 
-      const batchDelay = this.spacer * 2;
-      await this.ns.sleep(batchDelay);
+      await this.ns.sleep(this.taskDelay * 2);
     }
-  }
-
-  async deploy(): Promise<void> {
-    const tasks: Task[] = createBatch(this.ns, this, this.stealPercent);
-    await waitTillEnoughRamAvailable(this.ns, tasks);
-    await this.dispatchBatch(tasks);
-  }
-
-  async sendTask(task: Task): Promise<void> {
-    const data: string = JSON.stringify(task);
-    const port: NetscriptPort = this.ns.getPortHandle(this.portIndex);
-    port.clear();
-    await port.write(data);
-
-    await hackingLog(this.ns, HackLogType.sendTask, this.portIndex);
-
-    this.ports.push(port);
-    this.portIndex++;
-  }
-
-  async dispatchBatch(batch: Task[]): Promise<void> {
-    if (!batchHasEnoughRam(this.ns, batch)) {
-      reduceThreadAmount(this.ns, batch);
-    }
-
-    for (const task of batch) {
-      await this.dispatchWorker(task);
-    }
-  }
-
-  async dispatchWorker(task: Task): Promise<void> {
-    if (task.threads <= 0) {
-      return;
-    }
-
-    this.ns.run("hacking/tWorker.js", 1, this.portIndex);
-    await this.sendTask(task);
-
-    await hackingLog(this.ns, HackLogType.dispatch, this.portIndex);
   }
 }
