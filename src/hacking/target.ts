@@ -1,4 +1,6 @@
 import { NS, Player, Server } from "@ns";
+import { Batch, isBatch } from "/hacking/batch";
+import { Task } from "/hacking/task";
 import { getMostProfitableServer } from "/lib/profit-functions";
 import { hackingScripts } from "/scripts/Scripts";
 
@@ -21,10 +23,16 @@ export class Target {
     this.maxMoney = this.ns.getServerMaxMoney(this.server.hostname);
   }
 
-  update(script: hackingScripts, threads: number): void {
-    this.determineUpdateTypeOf(script, threads);
+  // Updates security and money based on task provided
+  update(job: Batch | Task): void {
+    if (isBatch(job)) {
+      job.tasks.forEach((task) => this.determineUpdateTypeOf(task));
+    } else {
+      this.determineUpdateTypeOf(job);
+    }
   }
 
+  // Check if a more profitable target is available, and changes if so
   checkForNewTarget(): boolean {
     const mostProfitableServer: Server = getMostProfitableServer(this.ns);
     if (this.changed(mostProfitableServer)) {
@@ -34,6 +42,7 @@ export class Target {
     return false;
   }
 
+  // Checks if the target changed
   changed(newTarget: Server): boolean {
     const targetChanged = this.server.hostname != newTarget.hostname;
     return targetChanged;
@@ -47,16 +56,16 @@ export class Target {
     this.money = this.server.moneyAvailable ?? 0;
   }
 
-  determineUpdateTypeOf(script: hackingScripts, threads: number): void {
-    switch (script) {
+  determineUpdateTypeOf(task: Task): void {
+    switch (task.script) {
       case hackingScripts.Hacking:
-        this.hackUpdate(threads);
+        this.hackUpdate(task.threads);
         break;
       case hackingScripts.Grow:
-        this.growUpdate(threads);
+        this.growUpdate(task.threads);
         break;
       case hackingScripts.Weaken:
-        this.weakenUpdate(threads);
+        this.weakenUpdate(task.threads);
         break;
       default:
         this.ns.print("WARN Unknown script type in task");

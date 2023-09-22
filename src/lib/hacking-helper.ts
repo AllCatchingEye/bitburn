@@ -1,8 +1,13 @@
 import { NS } from "@ns";
 import { Batch, isBatch } from "/hacking/batch";
 import { Task } from "/hacking/task";
+import { hackingScripts } from "/scripts/Scripts";
 import { getMaxRunnableThreads } from "/lib/thread-utils";
-import { waitForRam } from "/lib/ram-helper";
+import {
+  ramEnough,
+  calculateRamCost,
+  calculateAvailableRam,
+} from "/lib/ram-helper";
 
 export function distributeScript(
   ns: NS,
@@ -40,7 +45,9 @@ function execute(
 // Deploys a job.
 // A job can be a single task or a whole batch
 export async function deploy(ns: NS, job: Batch | Task): Promise<void> {
-  await waitForRam(ns, job);
+  if (!ramEnough(ns, job)) {
+    shrinkJob(ns, job);
+  }
 
   if (isBatch(job)) {
     for (const task of job.tasks) {
@@ -58,4 +65,29 @@ export async function dispatchWorker(ns: NS, task: Task): Promise<void> {
   }
 
   ns.run("hacking/tWorker.js", 1, JSON.stringify(task));
+}
+
+export function shrinkJob(ns: NS, job: Batch | Task): void {
+  const availableRam = calculateAvailableRam(ns);
+  const ramCost = calculateRamCost(ns, job);
+  const reduction = availableRam / ramCost;
+
+  if (isBatch(job)) {
+    job.tasks.forEach((task) => {
+      shrinkTask(reduction, task);
+    });
+  } else {
+    shrinkTask(reduction, job);
+  }
+}
+
+export function shrinkTask(reduction: number, task: Task): void {
+  const newThreadCount = task.threads * reduction;
+  if (task.script == hackingScripts.Weaken) {
+    // If the script is weaken, ceil to ensure security wont slowly raise
+    task.threads = Math.ceil(newThreadCount);
+  } else {
+    // Hack and grow will be floored
+    task.threads = Math.floor(newThreadCount);
+  }
 }

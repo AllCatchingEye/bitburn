@@ -5,7 +5,7 @@ import { Task, createTask, calculateTaskTime } from "/hacking/task";
 import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
 import { getUsableHosts } from "/lib/searchServers";
 import { disableLogs } from "/lib/helper-functions";
-import { createBatch } from "/hacking/batch";
+import { Batch, createBatch } from "/hacking/batch";
 import { deploy } from "/lib/hacking-helper";
 
 export async function main(ns: NS): Promise<void> {
@@ -48,15 +48,16 @@ export class Controller {
       this.usableServers = getUsableHosts(this.ns);
 
       const task: Task = this.prepareTask();
+
       await deploy(this.ns, task);
 
-      // Short delay between tasks, also necessary for loops in bitburn
+      this.target.update(task);
+      this.target.checkForNewTarget();
+
       const taskTime = calculateTaskTime(this.ns, task);
       prepEnd = Math.max(prepEnd, taskTime);
 
       await this.ns.sleep(this.taskDelay * 2);
-
-      this.target.checkForNewTarget();
     }
 
     const sleep = Math.max(
@@ -86,8 +87,16 @@ export class Controller {
   // Continously deploy batches
   async runHackingBatches(): Promise<void> {
     while (true) {
-      const batch = createBatch(this.ns, this);
+      const batch: Batch = createBatch(this.ns, this);
+
       await deploy(this.ns, batch);
+
+      this.target.update(batch);
+      //If the target changed, it needs to be prepared before use
+      if (this.target.checkForNewTarget()) {
+        await this.prepareTarget();
+        break;
+      }
 
       await this.ns.sleep(this.taskDelay * 2);
     }

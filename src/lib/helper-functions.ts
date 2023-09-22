@@ -1,4 +1,4 @@
-import { NS, Server } from "../../NetscriptDefinitions";
+import { NS } from "../../NetscriptDefinitions";
 
 export function calculateThreadAmount(
   ns: NS,

@@ -1,5 +1,4 @@
 import { NS } from "@ns";
-import { hackingScripts } from "/scripts/Scripts";
 import { Controller } from "/hacking/controller";
 import { Task } from "/hacking/task";
 import { Target } from "/hacking/target";
@@ -8,11 +7,12 @@ import { clamp } from "/lib/misc";
 export function calculateThreads(ns: NS, controller: Controller): number[] {
   const hackThreads = getHackThreads(ns, controller);
   const hackWeakenThreads = Math.ceil(hackThreads / 25); // 1x weaken == 25x hacks
-  controller.target.update(hackingScripts.Weaken, hackWeakenThreads);
-
-  const growThreads = getGrowThreads(ns, controller.target);
+  const growThreads = growthAnalyzeDynamic(
+    ns,
+    controller.target,
+    controller.stealPercent,
+  );
   const growWeakenThreads = Math.ceil(growThreads / 12.5); // 1x grow == 12.5x hacks
-  controller.target.update(hackingScripts.Weaken, growWeakenThreads);
 
   const threads: number[] = [
     hackThreads,
@@ -40,9 +40,6 @@ export function getHackThreads(ns: NS, controller: Controller): number {
 
   // Threads need to be whole a number
   const hackThreads = Math.floor(controller.stealPercent / hackPercent);
-
-  // Update target metrics for future thread calculation
-  controller.target.update(hackingScripts.Hacking, hackThreads);
 
   return hackThreads;
 }
@@ -91,7 +88,6 @@ export function getGrowThreads(ns: NS, target: Target): number {
   }
   growThreads = Math.ceil(growThreads);
 
-  target.update(hackingScripts.Grow, growThreads);
   return growThreads; // Only whole threads exist
 }
 
@@ -197,13 +193,4 @@ export function getMaxRunnableThreads(
   // Thread amount needs to be whole number
   const maxPossibleThreads = Math.floor(availableRamOnHost / scriptRamCost);
   return maxPossibleThreads;
-}
-
-export function shrinkThreads(reduction: number, task: Task): void {
-  const newThreadCount = task.threads * reduction;
-  if (task.script == "hacking/weaken.js") {
-    task.threads = Math.ceil(newThreadCount);
-  } else {
-    task.threads = Math.floor(newThreadCount);
-  }
 }

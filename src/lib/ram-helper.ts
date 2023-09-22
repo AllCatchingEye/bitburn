@@ -2,7 +2,7 @@ import { NS, Server } from "@ns";
 import { Task } from "/hacking/task";
 import { Batch, isBatch } from "/hacking/batch";
 import { getUsableHosts } from "/lib/searchServers";
-import { shrinkThreads } from "/lib/thread-utils";
+import { hackingScripts } from "/scripts/Scripts";
 
 export function calculateAvailableRam(ns: NS): number {
   const hosts = getUsableHosts(ns);
@@ -19,11 +19,25 @@ function calculateHostRam(ns: NS, host: Server): number {
     availableRamOnHost -= 64;
   }
 
-  const minimumRequiredRam = ns.getScriptRam("hacking/weaken.js");
+  const minimumRequiredRam = ns.getScriptRam(hackingScripts.Hacking);
   const usableRam =
     availableRamOnHost - (availableRamOnHost % minimumRequiredRam);
 
   return usableRam;
+}
+
+export function calculateRamCost(ns: NS, job: Batch | Task): number {
+  let jobRamCost = 0;
+  if (isBatch(job)) {
+    job.tasks.forEach((task) => {
+      const taskRamCost = calculateTaskRamUsage(ns, task);
+      jobRamCost += taskRamCost;
+    });
+  } else {
+    jobRamCost = calculateTaskRamUsage(ns, job);
+  }
+
+  return jobRamCost;
 }
 
 export function calculateTaskRamUsage(ns: NS, task: Task): number {
@@ -57,32 +71,4 @@ export function ramEnough(ns: NS, job: Batch | Task): boolean {
   const jobHasEnoughRam = availableRamAcrossHosts > jobRamCost;
 
   return jobHasEnoughRam;
-}
-
-export function shrinkRam(ns: NS, job: Batch | Task): void {
-  const availableRam = calculateAvailableRam(ns);
-  const ramCost = calculateRamCost(ns, job);
-  const reduction = availableRam / ramCost;
-
-  if (isBatch(job)) {
-    job.tasks.forEach((task) => {
-      shrinkThreads(reduction, task);
-    });
-  } else {
-    shrinkThreads(reduction, job);
-  }
-}
-
-function calculateRamCost(ns: NS, job: Batch | Task): number {
-  let jobRamCost = 0;
-  if (isBatch(job)) {
-    job.tasks.forEach((task) => {
-      const taskRamCost = calculateTaskRamUsage(ns, task);
-      jobRamCost += taskRamCost;
-    });
-  } else {
-    jobRamCost = calculateTaskRamUsage(ns, job);
-  }
-
-  return jobRamCost;
 }
