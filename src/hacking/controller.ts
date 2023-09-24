@@ -12,7 +12,7 @@ export async function main(ns: NS): Promise<void> {
   const functionNames: string[] = ["getServerMaxRam", "scan"];
   disableLogs(ns, functionNames);
 
-  const controller: Controller = new Controller(ns, 100);
+  const controller: Controller = new Controller(ns, 100, 0.25);
   await controller.start();
 }
 
@@ -20,15 +20,11 @@ export class Controller {
   ns: NS;
   metrics: Metrics;
   usableServers: Server[];
-  taskDelay: number;
-  stealPercent: number;
 
-  constructor(ns: NS, spacer: number) {
+  constructor(ns: NS, delay: number, greed: number) {
     this.ns = ns;
-    this.metrics = new Metrics(this.ns);
+    this.metrics = new Metrics(this.ns, delay, greed);
     this.usableServers = getUsableHosts(this.ns);
-    this.taskDelay = spacer;
-    this.stealPercent = 0.25;
   }
 
   async start(): Promise<void> {
@@ -55,12 +51,12 @@ export class Controller {
       const taskTime = calculateTaskTime(this.ns, task);
       prepEnd = Math.max(prepEnd, taskTime);
 
-      await this.ns.sleep(this.taskDelay * 2);
+      await this.ns.sleep(this.metrics.taskDelay * 2);
     }
 
     const sleep = Math.max(
-      prepEnd - Date.now() + this.taskDelay,
-      this.taskDelay,
+      prepEnd - Date.now() + this.metrics.taskDelay,
+      this.metrics.taskDelay,
     );
     await this.ns.sleep(sleep);
   }
@@ -98,7 +94,7 @@ export class Controller {
         break;
       }
 
-      await this.ns.sleep(this.taskDelay * 2);
+      await this.ns.sleep(this.metrics.taskDelay * 2);
     }
   }
 }

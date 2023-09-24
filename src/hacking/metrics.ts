@@ -7,14 +7,18 @@ import { getMostProfitableServer } from "/lib/profit-functions";
 export class Metrics {
   /** Provides access to Netscript functions */
   ns: NS;
-
   target: Target;
+  taskDelay: number;
+  greed: number;
 
-  constructor(ns: NS) {
+  constructor(ns: NS, delay: number, greed: number) {
     this.ns = ns;
 
     const mostProfitableServer = getMostProfitableServer(this.ns);
     this.target = new Target(this.ns, mostProfitableServer);
+
+    this.taskDelay = delay;
+    this.greed = greed;
   }
 
   // Updates security and money based on task provided
