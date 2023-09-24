@@ -1,4 +1,5 @@
 import { NS, Server } from "@ns";
+import { Batch, isBatch } from "/hacking/batch";
 import { Task } from "/hacking/task";
 import { hackingScripts } from "/scripts/Scripts";
 
@@ -47,7 +48,16 @@ export class Target implements Target {
     this.minDifficulty = server.minDifficulty ?? 0;
   }
 
-  update(task: Task): void {
+  // Updates security and money based on task provided
+  update(job: Batch | Task): void {
+    if (isBatch(job)) {
+      job.tasks.forEach((task) => this.determineUpdateType(task));
+    } else {
+      this.determineUpdateType(job);
+    }
+  }
+
+  determineUpdateType(task: Task): void {
     switch (task.script) {
       case hackingScripts.Hacking:
         this.hackUpdate(task.threads);

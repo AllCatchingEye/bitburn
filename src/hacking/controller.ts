@@ -45,7 +45,7 @@ export class Controller {
 
       await deploy(this.ns, task);
 
-      this.metrics.update(task);
+      this.metrics.target.update(task);
       this.metrics.checkForNewTarget();
 
       const taskTime = calculateTaskTime(this.ns, task);
@@ -87,7 +87,7 @@ export class Controller {
 
       await deploy(this.ns, batch);
 
-      this.metrics.update(batch);
+      this.metrics.target.update(batch);
       //If the target changed, it needs to be prepared before use
       if (this.metrics.checkForNewTarget()) {
         await this.prepareTarget();

@@ -1,7 +1,5 @@
 import { NS, Server } from "@ns";
 import { Target } from "./target";
-import { Batch, isBatch } from "/hacking/batch";
-import { Task } from "/hacking/task";
 import { getMostProfitableServer } from "/lib/profit-functions";
 
 export class Metrics {
@@ -19,15 +17,6 @@ export class Metrics {
 
     this.taskDelay = delay;
     this.greed = greed;
-  }
-
-  // Updates security and money based on task provided
-  update(job: Batch | Task): void {
-    if (isBatch(job)) {
-      job.tasks.forEach((task) => this.update(task));
-    } else {
-      this.update(job);
-    }
   }
 
   // Check if a more profitable target is available, and changes if so
