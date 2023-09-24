@@ -1,6 +1,6 @@
 import { NS, Server } from "@ns";
 import { hackingScripts } from "/scripts/Scripts";
-import { Target } from "/hacking/target";
+import { Metrics } from "/hacking/metrics";
 import { Task, createTask, calculateTaskTime } from "/hacking/task";
 import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
 import { getUsableHosts } from "/lib/searchServers";
@@ -18,16 +18,14 @@ export async function main(ns: NS): Promise<void> {
 
 export class Controller {
   ns: NS;
-  target: Target;
-  targetIsPrepared: boolean;
+  metrics: Metrics;
   usableServers: Server[];
   taskDelay: number;
   stealPercent: number;
 
   constructor(ns: NS, spacer: number) {
     this.ns = ns;
-    this.target = new Target(this.ns);
-    this.targetIsPrepared = false;
+    this.metrics = new Metrics(this.ns);
     this.usableServers = getUsableHosts(this.ns);
     this.taskDelay = spacer;
     this.stealPercent = 0.25;
@@ -44,15 +42,15 @@ export class Controller {
   // 2. The security is at a minimum
   async prepareTarget(): Promise<void> {
     let prepEnd = 0;
-    while (!this.target.isPrepped()) {
+    while (!this.metrics.target.isPrepped()) {
       this.usableServers = getUsableHosts(this.ns);
 
       const task: Task = this.prepareTask();
 
       await deploy(this.ns, task);
 
-      this.target.update(task);
-      this.target.checkForNewTarget();
+      this.metrics.update(task);
+      this.metrics.checkForNewTarget();
 
       const taskTime = calculateTaskTime(this.ns, task);
       prepEnd = Math.max(prepEnd, taskTime);
@@ -70,14 +68,14 @@ export class Controller {
   prepareTask(): Task {
     let script = "";
     let threads = 0;
-    if (!this.target.moneyIsPrepped()) {
+    if (!this.metrics.target.moneyIsPrepped()) {
       // Prepare money on target
       script = hackingScripts.Grow;
-      threads = getGrowThreads(this.ns, this.target);
+      threads = getGrowThreads(this.ns, this.metrics.target);
     } else {
       // Prepare security on target
       script = hackingScripts.Weaken;
-      threads = getMinSecThreads(this.ns, this.target);
+      threads = getMinSecThreads(this.ns, this.metrics.target);
     }
 
     const task: Task = createTask(this, script, threads);
@@ -87,13 +85,15 @@ export class Controller {
   // Continously deploy batches
   async runHackingBatches(): Promise<void> {
     while (true) {
+      this.usableServers = getUsableHosts(this.ns);
+
       const batch: Batch = createBatch(this.ns, this);
 
       await deploy(this.ns, batch);
 
-      this.target.update(batch);
+      this.metrics.update(batch);
       //If the target changed, it needs to be prepared before use
-      if (this.target.checkForNewTarget()) {
+      if (this.metrics.checkForNewTarget()) {
         await this.prepareTarget();
         break;
       }

@@ -1,62 +1,53 @@
-import { NS, Player, Server } from "@ns";
-import { Batch, isBatch } from "/hacking/batch";
+import { NS, Server } from "@ns";
 import { Task } from "/hacking/task";
-import { getMostProfitableServer } from "/lib/profit-functions";
 import { hackingScripts } from "/scripts/Scripts";
 
-export class Target {
+export interface Target {
+  /** Provides access to Netscript functions */
   ns: NS;
+
+  /** Hostname. Must be unique */
+  hostname: string;
+
   server: Server;
-  player: Player;
-  minSec: number;
-  sec: number;
-  maxMoney: number;
-  money: number;
 
-  constructor(ns: NS) {
+  /** How much money currently resides on the server and can be hacked */
+  moneyAvailable: number;
+
+  /** Maximum amount of money that this server can hold */
+  moneyMax: number;
+
+  /** Server Security Level */
+  hackDifficulty: number;
+
+  /** Minimum server security level that this server can be weakened to */
+  minDifficulty: number;
+
+  update(task: Task): void;
+  hackUpdate(threads: number): void;
+  weakenUpdate(threads: number): void;
+  growUpdate(threads: number): void;
+
+  calculateGrowPercent(threads: number): number;
+  complicatedFormula(threads: number): number;
+  simpleFormula(threads: number): number;
+
+  isPrepped(): boolean;
+  moneyIsPrepped(): boolean;
+  secIsPrepped(): boolean;
+}
+
+export class Target implements Target {
+  constructor(ns: NS, server: Server) {
     this.ns = ns;
-    this.server = getMostProfitableServer(this.ns);
-    this.player = this.ns.getPlayer();
-    this.minSec = this.ns.getServerMinSecurityLevel(this.server.hostname);
-    this.sec = this.ns.getServerSecurityLevel(this.server.hostname);
-    this.money = this.ns.getServerMoneyAvailable(this.server.hostname);
-    this.maxMoney = this.ns.getServerMaxMoney(this.server.hostname);
+    this.server = server;
+    this.moneyAvailable = server.moneyAvailable ?? 0;
+    this.moneyMax = server.moneyMax ?? 0;
+    this.hackDifficulty = server.hackDifficulty ?? 0;
+    this.minDifficulty = server.minDifficulty ?? 0;
   }
 
-  // Updates security and money based on task provided
-  update(job: Batch | Task): void {
-    if (isBatch(job)) {
-      job.tasks.forEach((task) => this.determineUpdateTypeOf(task));
-    } else {
-      this.determineUpdateTypeOf(job);
-    }
-  }
-
-  // Check if a more profitable target is available, and changes if so
-  checkForNewTarget(): boolean {
-    const mostProfitableServer: Server = getMostProfitableServer(this.ns);
-    if (this.changed(mostProfitableServer)) {
-      this.switchTarget(mostProfitableServer);
-      return true;
-    }
-    return false;
-  }
-
-  // Checks if the target changed
-  changed(newTarget: Server): boolean {
-    const targetChanged = this.server.hostname != newTarget.hostname;
-    return targetChanged;
-  }
-
-  switchTarget(newTarget: Server): void {
-    this.server = newTarget;
-    this.minSec = this.server.minDifficulty ?? 0;
-    this.sec = this.server.hackDifficulty ?? 0;
-    this.maxMoney = this.server.moneyMax ?? 0;
-    this.money = this.server.moneyAvailable ?? 0;
-  }
-
-  determineUpdateTypeOf(task: Task): void {
+  update(task: Task): void {
     switch (task.script) {
       case hackingScripts.Hacking:
         this.hackUpdate(task.threads);
@@ -78,48 +69,43 @@ export class Target {
     const hackEffect = this.ns.hackAnalyze(this.server.hostname);
     const hackChance = this.ns.hackAnalyzeChance(this.server.hostname);
     const hackPercent = hackEffect * threads * hackChance;
-    this.money = Math.max(this.money - this.money * hackPercent, 0);
+    this.moneyAvailable = Math.max(
+      this.moneyAvailable - this.moneyAvailable * hackPercent,
+      0,
+    );
 
     // update security
     const hackSecIncrease = this.ns.hackAnalyzeSecurity(
       threads,
       this.server.hostname,
     );
-    this.sec = Math.min(this.sec + hackSecIncrease, 100); // Max amount of security is 100
-  }
-
-  calculateHackExpGain(): number {
-    const baseDifficulty = this.ns.getServerBaseSecurityLevel(
-      this.server.hostname,
-    );
-    const baseExpGain = 3;
-    const diffFactor = 0.3;
-
-    let expGain = baseExpGain;
-    expGain += baseDifficulty * diffFactor;
-    expGain = expGain * this.player.mults.hacking_exp;
-
-    return expGain;
+    this.hackDifficulty = Math.min(this.hackDifficulty + hackSecIncrease, 100); // Max amount of security is 100
   }
 
   weakenUpdate(threads: number): void {
     const weakenSecDecrease = this.ns.weakenAnalyze(threads);
 
     // Security cant go below minimum
-    this.sec = Math.max(this.sec - weakenSecDecrease, this.minSec);
+    this.hackDifficulty = Math.max(
+      this.hackDifficulty - weakenSecDecrease,
+      this.minDifficulty,
+    );
   }
 
   growUpdate(threads: number): void {
     // update money
     const growPercent = this.calculateGrowPercent(threads);
-    this.money = Math.min((this.money + 1) * (1 + growPercent), this.maxMoney);
+    this.moneyAvailable = Math.min(
+      (this.moneyAvailable + 1) * (1 + growPercent),
+      this.moneyMax,
+    );
 
     // update security
     const growSecIncrease = this.ns.growthAnalyzeSecurity(
       threads,
       this.server.hostname,
     );
-    this.sec = Math.min(this.sec + growSecIncrease, 100); // Max amount of security is 100
+    this.hackDifficulty = Math.min(this.hackDifficulty + growSecIncrease, 100); // Max amount of security is 100
   }
 
   // Calculates the growPercent of a given grow Task
@@ -133,19 +119,6 @@ export class Target {
       growPercent = this.complicatedFormula(threads);
     }
     return growPercent / 100;
-  }
-
-  // Calculates the growPercent by using the by formulas provided function for it
-  simpleFormula(threads: number): number {
-    const player = this.ns.getPlayer();
-    const server = this.ns.getServer(this.server.hostname);
-    const growPercent = this.ns.formulas.hacking.growPercent(
-      server,
-      threads,
-      player,
-    );
-
-    return growPercent;
   }
 
   // Uses a more complitated Formula to calculate grow percent
@@ -162,22 +135,35 @@ export class Target {
     return growPercent;
   }
 
+  // Calculates the growPercent by using the by formulas provided function for it
+  simpleFormula(threads: number): number {
+    const player = this.ns.getPlayer();
+    const server = this.ns.getServer(this.server.hostname);
+    const growPercent = this.ns.formulas.hacking.growPercent(
+      server,
+      threads,
+      player,
+    );
+
+    return growPercent;
+  }
+
   // Checks if a server is prepared for a batch
   isPrepped(): boolean {
-    const moneyPrepped = this.moneyIsPrepped();
-    const secPrepped = this.secIsPrepped();
+    const moneyPrepped = this.moneyAvailableIsPrepped();
+    const secPrepped = this.hackDifficultyIsPrepped();
     const isPrepped = moneyPrepped && secPrepped;
 
     return isPrepped;
   }
 
-  moneyIsPrepped(): boolean {
-    const moneyIsPrepped = this.money === this.maxMoney;
+  moneyAvailableIsPrepped(): boolean {
+    const moneyIsPrepped = this.moneyAvailable === this.moneyMax;
     return moneyIsPrepped;
   }
 
-  secIsPrepped(): boolean {
-    const secToFix = Math.abs(this.sec - this.minSec);
+  hackDifficultyIsPrepped(): boolean {
+    const secToFix = Math.abs(this.hackDifficulty - this.minDifficulty);
 
     const tolerance = 0.0001; // Fix for floating point accuracy
     const secIsPrepped = secToFix < tolerance;

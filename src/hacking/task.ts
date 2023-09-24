@@ -40,7 +40,7 @@ export function createTask(
   threads: number,
   delay = 0,
 ): Task {
-  const target: Server = controller.target.server;
+  const target: Server = controller.metrics.target.server;
   const hosts: Server[] = controller.usableServers;
   const task = {
     target: target,
@@ -53,16 +53,17 @@ export function createTask(
 }
 
 export function calculateTaskTime(ns: NS, task: Task): number {
+  const hackTime = ns.getHackTime(task.target.hostname);
   let taskTime = 0;
   switch (task.script) {
     case hackingScripts.Grow:
-      taskTime = ns.getGrowTime(task.target.hostname);
+      taskTime = hackTime * 3.2;
       break;
     case hackingScripts.Weaken:
-      taskTime = ns.getWeakenTime(task.target.hostname);
+      taskTime = hackTime * 4;
       break;
     case hackingScripts.Hacking:
-      taskTime = ns.getHackTime(task.target.hostname);
+      taskTime = hackTime;
       break;
     default:
       break;

@@ -1,16 +1,16 @@
 import { NS } from "@ns";
 import { Controller } from "/hacking/controller";
 import { Task } from "/hacking/task";
-import { Target } from "/hacking/target";
 import { clamp } from "/lib/misc";
+import { Target } from "/hacking/target";
 
 export function calculateThreads(ns: NS, controller: Controller): number[] {
   const hackThreads = getHackThreads(ns, controller);
   const hackWeakenThreads = Math.ceil(hackThreads / 25); // 1x weaken == 25x hacks
   const growThreads = growthAnalyzeDynamic(
     ns,
-    controller.target,
-    controller.stealPercent,
+    controller.metrics.target,
+    1 + controller.stealPercent,
   );
   const growWeakenThreads = Math.ceil(growThreads / 12.5); // 1x grow == 12.5x hacks
 
@@ -31,11 +31,11 @@ export function getHackThreads(ns: NS, controller: Controller): number {
   if (ns.fileExists("Formulas.exe", "home")) {
     // Info required for formulas
     const player = ns.getPlayer();
-    const server = controller.target.server;
+    const server = controller.metrics.target.server;
 
     hackPercent = ns.formulas.hacking.hackPercent(server, player);
   } else {
-    hackPercent = getHackEffect(ns, controller.target);
+    hackPercent = getHackEffect(ns, controller.metrics.target);
   }
 
   // Threads need to be whole a number
@@ -51,7 +51,7 @@ export function getHackThreads(ns: NS, controller: Controller): number {
 function getHackEffect(ns: NS, target: Target): number {
   const hostname = target.server.hostname;
 
-  const hackDifficulty = target.sec;
+  const hackDifficulty = target.hackDifficulty;
   const difficultyMultiplier = (100 - hackDifficulty) / 100;
 
   const hackStealMultiplier = ns.getPlayer().mults.hacking_money;
@@ -71,8 +71,8 @@ function getHackEffect(ns: NS, target: Target): number {
 // Returns the amount of threads necessary,
 // to grow money to maximum on a provided target
 export function getGrowThreads(ns: NS, target: Target): number {
-  const maxMoney = target.maxMoney;
-  const money = target.money;
+  const maxMoney = target.moneyMax;
+  const money = target.moneyAvailable;
 
   let growThreads = 0;
   if (ns.fileExists("Formulas.exe")) {
@@ -97,8 +97,8 @@ function createMockServer(ns: NS, target: Target) {
   mockServer = target.server;
 
   // Use predicted money and security values, not current ones
-  const money = target.money;
-  const sec = target.sec;
+  const money = target.moneyAvailable;
+  const sec = target.hackDifficulty;
   mockServer.moneyAvailable = money;
   mockServer.hackDifficulty = sec;
 
@@ -131,7 +131,7 @@ function growthAnalyzeDynamic(
 
 export function calculateDelays(ns: NS, controller: Controller): number[] {
   // Get hostname of target
-  const target = controller.target.server.hostname;
+  const target = controller.metrics.target.server.hostname;
 
   // Timings are the basis for delay calculation
   const hackTime = ns.getHackTime(target);
@@ -159,7 +159,7 @@ export function calculateDelays(ns: NS, controller: Controller): number[] {
 export function getMinSecThreads(ns: NS, target: Target): number {
   const hostname = target.server.hostname;
   const minSec = ns.getServerMinSecurityLevel(hostname);
-  const sec = target.sec;
+  const sec = target.hackDifficulty;
   const weakenEffect = ns.weakenAnalyze(1);
 
   const weakenThreads = Math.abs(sec - minSec) / weakenEffect;
