@@ -94,7 +94,8 @@ function getPossibleTargets(ns: NS): Server[] {
     .filter(
       (server) =>
         server.requiredHackingSkill ?? 0 <= ns.getPlayer().skills.hacking,
-    );
+    )
+    .filter((server) => server.hasAdminRights);
 
   return possibleTargets;
 }
