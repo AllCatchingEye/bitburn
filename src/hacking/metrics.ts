@@ -8,8 +8,9 @@ export class Metrics {
   target: Target;
   taskDelay: number;
   greed: number;
+  loggerPid: number;
 
-  constructor(ns: NS, delay: number, greed: number) {
+  constructor(ns: NS, delay: number, greed: number, loggerPid: number) {
     this.ns = ns;
 
     const mostProfitableServer = getMostProfitableServer(this.ns);
@@ -17,25 +18,25 @@ export class Metrics {
 
     this.taskDelay = delay;
     this.greed = greed;
+    this.loggerPid = loggerPid;
   }
 
-  // Check if a more profitable target is available, and changes if so
   checkForNewTarget(): boolean {
     const mostProfitableServer: Server = getMostProfitableServer(this.ns);
-    if (this.changed(mostProfitableServer)) {
-      this.switchTarget(mostProfitableServer);
+
+    // Checks if most profitable server is not the same
+    const targetChanged = this.target.hostname != mostProfitableServer.hostname;
+    if (targetChanged) {
+      // Log target change
+      this.ns.writePort(
+        this.loggerPid,
+        `Target changed from ${this.target.hostname} to ${mostProfitableServer.hostname}`,
+      );
+
+      this.target = new Target(this.ns, mostProfitableServer);
       return true;
     }
+
     return false;
-  }
-
-  // Checks if the target changed
-  changed(newTarget: Server): boolean {
-    const targetChanged = this.target.hostname != newTarget.hostname;
-    return targetChanged;
-  }
-
-  switchTarget(server: Server): void {
-    this.target = new Target(this.ns, server);
   }
 }

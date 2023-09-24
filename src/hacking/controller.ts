@@ -12,22 +12,26 @@ export async function main(ns: NS): Promise<void> {
   const functionNames: string[] = ["getServerMaxRam", "scan"];
   disableLogs(ns, functionNames);
 
-  const controller: Controller = new Controller(ns, 100, 0.25);
+  const loggerPid = ns.args[0] as number;
+  const controller: Controller = new Controller(ns, loggerPid, 100, 0.25);
   await controller.start();
 }
 
 export class Controller {
   ns: NS;
   metrics: Metrics;
+  loggerPid: number;
   usableServers: Server[];
 
-  constructor(ns: NS, delay: number, greed: number) {
+  constructor(ns: NS, loggerPid: number, delay: number, greed: number) {
     this.ns = ns;
-    this.metrics = new Metrics(this.ns, delay, greed);
+    this.loggerPid = loggerPid;
+    this.metrics = new Metrics(this.ns, delay, greed, loggerPid);
     this.usableServers = getUsableHosts(this.ns);
   }
 
   async start(): Promise<void> {
+    this.ns.writePort(this.loggerPid, "New controller started...");
     await this.prepareTarget();
 
     await this.runHackingBatches();
@@ -37,6 +41,12 @@ export class Controller {
   // 1. It has the maximum amount of money available
   // 2. The security is at a minimum
   async prepareTarget(): Promise<void> {
+    // Log start of preparation
+    this.ns.writePort(
+      this.loggerPid,
+      `Preparing server ${this.metrics.target.server.hostname} for batching...`,
+    );
+
     let prepEnd = 0;
     while (!this.metrics.target.isPrepped()) {
       this.usableServers = getUsableHosts(this.ns);
@@ -80,6 +90,12 @@ export class Controller {
 
   // Continously deploy batches
   async runHackingBatches(): Promise<void> {
+    // Log start of deployment
+    this.ns.writePort(
+      this.loggerPid,
+      `Deploying batches for ${this.metrics.target.server.hostname}`,
+    );
+
     while (true) {
       this.usableServers = getUsableHosts(this.ns);
 
