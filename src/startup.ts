@@ -5,20 +5,28 @@ import { NS } from "@ns";
  * @param {NS} ns - Mandatory to access netscript functions
  */
 export async function main(ns: NS): Promise<void> {
-  while (true) {
-    startCracker(ns);
+  //while (true) {
+  const loggerPid: number = startLogger(ns);
 
-    startHacking(ns);
+  startCracker(ns);
 
-    startServerExpander(ns);
+  startHacking(ns, loggerPid);
 
-    startWatcher(ns);
+  startServerExpander(ns);
 
-    // Not profitable for now
-    //startHacknet(ns);
+  startWatcher(ns);
 
-    await ns.sleep(1000);
-  }
+  // Not profitable for now
+  //startHacknet(ns);
+
+  //await ns.sleep(1000);
+  //}
+}
+
+function startLogger(ns: NS): number {
+  const script = "hacking/logging.js";
+  const pid: number = startScript(ns, script);
+  return pid;
 }
 
 function startCracker(ns: NS) {
@@ -26,15 +34,15 @@ function startCracker(ns: NS) {
   startScript(ns, script);
 }
 
-function startHacking(ns: NS) {
+function startHacking(ns: NS, loggerPid: number) {
   const script = "hacking/controller.js";
-  startScript(ns, script);
+  startScript(ns, script, loggerPid);
 }
 
 function startServerExpander(ns: NS) {
   if (hasEnoughMoney(ns)) {
-    const serverExpander = "expand-servers.js";
-    ns.run(serverExpander);
+    const script = "expand-servers.js";
+    startScript(ns, script);
   }
 }
 
@@ -49,13 +57,21 @@ function startWatcher(ns: NS) {
   startScript(ns, script);
 }
 
+/*
 function startHacknet(ns: NS) {
   const script = "hacknet-nodes-upgrader.js";
   startScript(ns, script);
 }
+*/
 
-function startScript(ns: NS, script: string) {
+function startScript(
+  ns: NS,
+  script: string,
+  ...args: (string | number | boolean)[]
+): number {
+  let pid = 0;
   if (!ns.scriptRunning(script, "home")) {
-    ns.run(script);
+    pid = ns.run(script, 1, ...args);
   }
+  return pid;
 }

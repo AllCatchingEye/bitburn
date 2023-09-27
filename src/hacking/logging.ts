@@ -2,15 +2,14 @@ import { NS, NetscriptPort } from "@ns";
 
 export async function main(ns: NS): Promise<void> {
   const logger: Logger = new Logger(ns);
-  logger.listen();
+  await logger.start();
 }
 
 export interface Logger {
   ns: NS;
   port: NetscriptPort;
-  filename: string;
 
-  listen(): void;
+  start(): void;
 }
 
 export class Logger implements Logger {
@@ -19,16 +18,26 @@ export class Logger implements Logger {
     this.port = this.ns.getPortHandle(ns.pid);
   }
 
-  async listen(): Promise<void> {
-    await this.ns.write(this.filename, "", "w");
+  async start(): Promise<void> {
+    /*
+    await this.ns.write("log.txt", "", "w");
     while (true) {
-      await this.port.nextWrite();
+      await this.log();
 
+      // Prevents freeze
+      await this.ns.sleep(5);
+    }
+  */
+  }
+
+  async log(): Promise<void> {
+    while (!this.port.empty()) {
       const portData: string = this.port.read() as string;
 
       await this.ns.write("log.txt", portData, "a");
 
-      await this.ns.sleep(100);
+      // Prevents freeze
+      await this.ns.sleep(5);
     }
   }
 }

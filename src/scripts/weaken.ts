@@ -1,4 +1,5 @@
 import { NS } from "../../NetscriptDefinitions";
+import { Task } from "/hacking/task";
 
 /**
  * Runs weaken on the given target
@@ -6,7 +7,20 @@ import { NS } from "../../NetscriptDefinitions";
  * @argument {string} target - Server name of the target
  */
 export async function main(ns: NS): Promise<void> {
-  const target = ns.args[0] as string;
-  const delay = ns.args[1] as number;
-  await ns.weaken(target, { additionalMsec: delay });
+  const task: Task = JSON.parse(ns.args[0] as string);
+
+  let delay = task.end - task.time - Date.now();
+  if (delay < 0) {
+    ns.writePort(
+      task.loggerPid,
+      `WARN: Batch ${task.batchId} ${task.script} was ${-delay}ms too late. (${
+        task.end
+      })\n`,
+    );
+    delay = 0;
+  }
+
+
+  await ns.weaken(task.target.hostname, { additionalMsec: delay });
+  //const end = Date.now();
 }

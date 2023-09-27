@@ -1,14 +1,11 @@
 import { NS, Server } from "@ns";
-import { Batch, isBatch } from "/hacking/batch";
+import { Job, isBatch } from "/hacking/job";
 import { Task } from "/hacking/task";
 import { hackingScripts } from "/scripts/Scripts";
 
 export interface Target {
   /** Provides access to Netscript functions */
   ns: NS;
-
-  /** Hostname. Must be unique */
-  hostname: string;
 
   server: Server;
 
@@ -24,7 +21,7 @@ export interface Target {
   /** Minimum server security level that this server can be weakened to */
   minDifficulty: number;
 
-  update(task: Task): void;
+  update(job: Job): void;
   hackUpdate(threads: number): void;
   weakenUpdate(threads: number): void;
   growUpdate(threads: number): void;
@@ -52,11 +49,11 @@ export class Target implements Target {
    * Updates the target for either a whole batch or a single task
    * @param job - If a batch or single task was executed
    */
-  update(job: Batch | Task): void {
-    if (isBatch(job)) {
+  update(job: Job): void {
+    if (isBatch(job.tasks)) {
       job.tasks.forEach((task) => this.determineUpdateType(task));
     } else {
-      this.determineUpdateType(job);
+      this.determineUpdateType(job.tasks);
     }
   }
 

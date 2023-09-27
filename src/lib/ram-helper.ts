@@ -1,49 +1,96 @@
 import { NS, Server } from "@ns";
+import { Job, isBatch } from "/hacking/job";
 import { Task } from "/hacking/task";
-import { Batch, isBatch } from "/hacking/batch";
 import { getUsableHosts } from "/lib/searchServers";
-import { hackingScripts } from "/scripts/Scripts";
+import { getStartupScriptsList, hackingScripts } from "/scripts/Scripts";
 
-export function calculateAvailableRam(ns: NS): number {
-  const hosts = getUsableHosts(ns);
+export interface RamNet {
+  ns: NS;
+  maxRam: number;
+  availableRam: number;
+  blocks: [Server, number][];
+}
+
+export class RamNet implements RamNet {
+  ns: NS;
+  maxRam: number;
+  availableRam: number;
+  blocks: [Server, number][];
+
+  constructor(ns: NS) {
+    this.ns = ns;
+    this.maxRam = getTotalRam(ns);
+    this.availableRam = getAvailableRam(ns);
+    this.blocks = calculateBlocks(ns);
+  }
+}
+
+function calculateBlocks(ns: NS): [Server, number][] {
+  const hosts: Server[] = getUsableHosts(ns);
+  const blocks: [Server, number][] = hosts.map((host) => [host, host.maxRam]);
+
+  return blocks;
+}
+
+export function getAvailableRam(ns: NS): number {
+  let hosts = getUsableHosts(ns);
+  hosts = hosts.filter((host) => calculateFreeRam(host) >= 1.75);
+
   let availableRam = 0;
   hosts.forEach((host) => {
     availableRam += calculateHostRam(ns, host);
   });
+
   return availableRam;
+}
+
+function calculateFreeRam(host: Server) {
+  return host.maxRam - host.ramUsed;
 }
 
 function calculateHostRam(ns: NS, host: Server): number {
   let availableRamOnHost = host.maxRam - host.ramUsed;
   if (host.hostname == "home") {
-    availableRamOnHost -= 64;
+    availableRamOnHost -= calculateStartupScriptsRam(ns);
+    availableRamOnHost = Math.max(availableRamOnHost, 0);
   }
 
-  const minimumRequiredRam = ns.getScriptRam(hackingScripts.Hacking);
-  const usableRam =
-    availableRamOnHost - (availableRamOnHost % minimumRequiredRam);
+  const scriptRamCost = ns.getScriptRam(hackingScripts.Weaken);
+  const usableRam = availableRamOnHost - (availableRamOnHost % scriptRamCost);
 
   return usableRam;
 }
 
-export function calculateRamCost(ns: NS, job: Batch | Task): number {
+function calculateStartupScriptsRam(ns: NS): number {
+  const startupScripts: string[] = getStartupScriptsList();
+  const startupScriptsRamCost = 0;
+  startupScripts.forEach(
+    (script) => startupScriptsRamCost + ns.getScriptRam(script),
+  );
+
+  return startupScriptsRamCost;
+}
+
+export function calculateRamCost(ns: NS, tasks: Task[] | Task): number {
   let jobRamCost = 0;
-  if (isBatch(job)) {
-    job.tasks.forEach((task) => {
-      const taskRamCost = calculateTaskRamUsage(ns, task);
+  if (isBatch(tasks)) {
+    tasks.forEach((task) => {
+      const taskRamCost = calculateTaskRamUsage(ns, task.script, task.threads);
       jobRamCost += taskRamCost;
     });
   } else {
-    jobRamCost = calculateTaskRamUsage(ns, job);
+    jobRamCost = calculateTaskRamUsage(ns, tasks.script, tasks.threads);
   }
 
   return jobRamCost;
 }
 
-export function calculateTaskRamUsage(ns: NS, task: Task): number {
-  const scriptRamCost = ns.getScriptRam(task.script);
-  const taskRamCost = scriptRamCost * task.threads;
-  return taskRamCost;
+export function calculateTaskRamUsage(
+  ns: NS,
+  script: string,
+  threads: number,
+): number {
+  return ns.getScriptRam(script) * threads;
 }
 
 export function getTotalRam(ns: NS): number {
@@ -55,20 +102,7 @@ export function getTotalRam(ns: NS): number {
   return totalRam;
 }
 
-// Waits until enough ram is available for a job
-export async function waitForRam(ns: NS, job: Batch | Task): Promise<void> {
-  while (!ramEnough(ns, job)) {
-    await ns.sleep(100);
-  }
-  return;
-}
-
 // Checks if enough ram is available across hosts for a job
-export function ramEnough(ns: NS, job: Batch | Task): boolean {
-  const availableRamAcrossHosts = calculateAvailableRam(ns);
-  const jobRamCost = calculateRamCost(ns, job);
-
-  const jobHasEnoughRam = availableRamAcrossHosts > jobRamCost;
-
-  return jobHasEnoughRam;
+export function ramEnough(ns: NS, job: Job): boolean {
+  return getAvailableRam(ns) > job.ramCost;
 }

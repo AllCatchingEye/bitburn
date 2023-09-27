@@ -4,7 +4,20 @@ export enum hackingScripts {
   Weaken = "/scripts/weaken.js",
 }
 
-export function getScriptsList(): string[] {
+export enum startupScripts {
+  startup = "startup.js",
+  Cracker = "/hacking/server-cracker.js",
+  Watcher = "watcher.js",
+  Controller = "/hacking/controller.js",
+  Expander = "expand-server.js",
+}
+
+export function getStartupScriptsList(): string[] {
+  const scripts: string[] = Object.values(startupScripts);
+  return scripts;
+}
+
+export function getHackingScriptsList(): string[] {
   const scripts: string[] = Object.values(hackingScripts);
   return scripts;
 }

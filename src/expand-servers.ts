@@ -69,6 +69,6 @@ function upgradeServers(ns: NS, servers: Server[]): void {
 }
 
 function tryUpgradeServer(ns: NS, server: Server): void {
-  const ramUpgradeSize = server.maxRam ** 2;
+  const ramUpgradeSize = server.maxRam * 2;
   ns.upgradePurchasedServer(server.hostname, ramUpgradeSize);
 }

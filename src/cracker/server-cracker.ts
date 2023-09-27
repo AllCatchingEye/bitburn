@@ -1,7 +1,7 @@
 import { NS, Server } from "../../NetscriptDefinitions";
 import { canOpenAllRequiredPorts, openPorts } from "/cracker/Ports";
 import { searchServers } from "/lib/searchServers";
-import { getScriptsList } from "/scripts/Scripts";
+import { getHackingScriptsList } from "/scripts/Scripts";
 
 export async function main(ns: NS): Promise<void> {
   disableLogs(ns);
@@ -38,10 +38,9 @@ async function crackServer(ns: NS, server: Server): Promise<void> {
 
 function canCrack(ns: NS, host: Server) {
   const canHack = hackLevelEnough(ns, host);
-  const isNotCracked = !serverCracked(ns, host);
   const canOpenPorts = canOpenAllRequiredPorts(ns, host);
 
-  const canCrack = canHack && isNotCracked && canOpenPorts;
+  const canCrack = canHack && canOpenPorts;
   return canCrack;
 }
 
@@ -51,27 +50,13 @@ function hackLevelEnough(ns: NS, host: Server): boolean {
   return playerHackingLevel >= requiredHackingLevel;
 }
 
-function serverCracked(ns: NS, server: Server) {
-  const filesCopied = filesExists(ns, server);
-  const isCracked = (server.hasAdminRights ?? true) && filesCopied;
-  return isCracked;
-}
-
-function filesExists(ns: NS, server: Server) {
-  const files = getScriptsList();
-  const filesCopied = files.every((file) =>
-    ns.fileExists(file, server.hostname),
-  );
-  return filesCopied;
-}
-
 /**
  * Copies scripts of the hacking functions to the given destination
  * @param {NS} ns - Mandatory to access netscript functions
  * @param {string} destination - Where the scripts should be copied to
  */
 async function copyScripts(ns: NS, destination: Server) {
-  const scripts: string[] = getScriptsList();
+  const scripts: string[] = getHackingScriptsList();
   await ns.scp(scripts, destination.hostname);
 }
 

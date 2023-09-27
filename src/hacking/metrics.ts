@@ -1,5 +1,5 @@
 import { NS, Server } from "@ns";
-import { Target } from "./target";
+import { Target } from "/hacking/target";
 import { getMostProfitableServer } from "/lib/profit-functions";
 
 export class Metrics {
@@ -10,6 +10,9 @@ export class Metrics {
   greed: number;
   loggerPid: number;
 
+  nextTaskId: number;
+  nextBatchId: number;
+
   constructor(ns: NS, delay: number, greed: number, loggerPid: number) {
     this.ns = ns;
 
@@ -19,18 +22,30 @@ export class Metrics {
     this.taskDelay = delay;
     this.greed = greed;
     this.loggerPid = loggerPid;
+
+    this.nextTaskId = 0;
+    this.nextBatchId = 0;
   }
 
-  checkForNewTarget(): boolean {
+  get taskId(): number {
+    return this.nextTaskId++;
+  }
+
+  get batchId(): number {
+    return this.nextBatchId++;
+  }
+
+  targetChanged(): boolean {
     const mostProfitableServer: Server = getMostProfitableServer(this.ns);
 
     // Checks if most profitable server is not the same
-    const targetChanged = this.target.hostname != mostProfitableServer.hostname;
+    const targetChanged =
+      this.target.server.hostname != mostProfitableServer.hostname;
     if (targetChanged) {
       // Log target change
       this.ns.writePort(
         this.loggerPid,
-        `Target changed from ${this.target.hostname} to ${mostProfitableServer.hostname}`,
+        `Target changed from ${this.target.server.hostname} to ${mostProfitableServer.hostname}`,
       );
 
       this.target = new Target(this.ns, mostProfitableServer);

@@ -40,17 +40,20 @@ function filterServers(filters: RegExp[], servers: Server[]): Server[] {
 export function searchServers(ns: NS, root: Server): Server[] {
   const found = new Set<string>();
   const searchResult: Server[] = scanServer(ns, root, found);
-  searchResult.unshift(root);
+  searchResult.push(root);
+
   return searchResult;
 }
 
 export function getUsableHosts(ns: NS): Server[] {
   const homeServer = ns.getServer("home");
+
   const hosts: Server[] = searchServers(ns, homeServer);
+
   const filteredHosts: Server[] = hosts
-    .map((host: Server) => ns.getServer(host.hostname))
     .filter((server) => server.hasAdminRights)
-    .filter((server) => server.maxRam !== 0);
+    .filter((server) => server.maxRam !== 1.6);
+
   return filteredHosts;
 }
 

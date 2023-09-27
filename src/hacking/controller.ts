@@ -1,116 +1,179 @@
 import { NS, Server } from "@ns";
-import { hackingScripts } from "/scripts/Scripts";
+//import { hackingScripts } from "/scripts/Scripts";
 import { Metrics } from "/hacking/metrics";
-import { Task, createTask, calculateTaskTime } from "/hacking/task";
-import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
-import { getUsableHosts } from "/lib/searchServers";
-import { disableLogs } from "/lib/helper-functions";
-import { Batch, createBatch } from "/hacking/batch";
-import { deploy } from "/lib/hacking-helper";
+//import { Task } from "/hacking/task";
+/*import {
+  getGrowThreads,
+  getMinSecThreads,
+  calculateRunnableThreads,
+} from "/lib/thread-utils";
+*/
+//import { disableLogs } from "/lib/helper-functions";
+//import { Job, isBatch, createJob } from "/hacking/job";
+//import { getUsableHosts } from "/lib/searchServers";
+//import { shrinkJob } from "/lib/hacking-helper";
+//import { ramEnough } from "/lib/ram-helper";
 
 export async function main(ns: NS): Promise<void> {
-  const functionNames: string[] = ["getServerMaxRam", "scan"];
-  disableLogs(ns, functionNames);
-
-  const loggerPid = ns.args[0] as number;
-  const controller: Controller = new Controller(ns, loggerPid, 100, 0.25);
-  await controller.start();
+  //const functionNames: string[] = ["getServerMaxRam", "scan"];
+  //disableLogs(ns, functionNames);
+  //const loggerPid = ns.args[0] as number;
+  //const controller: Controller = new Controller(ns, loggerPid, 5, 0.05);
+  //await controller.start();
 }
 
 export class Controller {
   ns: NS;
   metrics: Metrics;
   loggerPid: number;
-  usableServers: Server[];
 
   constructor(ns: NS, loggerPid: number, delay: number, greed: number) {
     this.ns = ns;
     this.loggerPid = loggerPid;
     this.metrics = new Metrics(this.ns, delay, greed, loggerPid);
-    this.usableServers = getUsableHosts(this.ns);
   }
 
   async start(): Promise<void> {
-    this.ns.writePort(this.loggerPid, "New controller started...");
-    await this.prepareTarget();
-
-    await this.runHackingBatches();
+    //this.log("New controller started...\n");
+    //await this.startPreparation();
+    //await this.run();
   }
 
-  // Prepares a server for optimal hacking conditions:
-  // 1. It has the maximum amount of money available
-  // 2. The security is at a minimum
-  async prepareTarget(): Promise<void> {
-    // Log start of preparation
-    this.ns.writePort(
-      this.loggerPid,
-      `Preparing server ${this.metrics.target.server.hostname} for batching...`,
-    );
+  /**
+   * Will prepare the server by
+   * 1. Maximizing money
+   * 2. Minimizing security
+   */
+  async startPreparation(): Promise<void> {
+    this.log("Preparing target...\n");
 
-    let prepEnd = 0;
-    while (!this.metrics.target.isPrepped()) {
-      this.usableServers = getUsableHosts(this.ns);
+    await this.prepareMoney();
+    await this.prepareSecurity();
 
-      const task: Task = this.prepareTask();
+    this.log("Target has been prepared\n");
+  }
 
-      await deploy(this.ns, task);
+  /** Maximize available money on a server */
+  async prepareMoney(): Promise<void> {
+    this.log("Preparing money on target...\n");
 
-      this.metrics.target.update(task);
-      this.metrics.checkForNewTarget();
-
-      const taskTime = calculateTaskTime(this.ns, task);
-      prepEnd = Math.max(prepEnd, taskTime);
-
-      await this.ns.sleep(this.metrics.taskDelay * 2);
+    while (!this.metrics.target.moneyIsPrepped()) {
+      const growThreads = getGrowThreads(this.ns, this.metrics.target);
+      await this.deployPreparation(hackingScripts.Grow, growThreads);
     }
-
-    const sleep = Math.max(
-      prepEnd - Date.now() + this.metrics.taskDelay,
-      this.metrics.taskDelay,
-    );
-    await this.ns.sleep(sleep);
   }
 
-  prepareTask(): Task {
-    let script = "";
-    let threads = 0;
-    if (!this.metrics.target.moneyIsPrepped()) {
-      // Prepare money on target
-      script = hackingScripts.Grow;
-      threads = getGrowThreads(this.ns, this.metrics.target);
-    } else {
-      // Prepare security on target
-      script = hackingScripts.Weaken;
-      threads = getMinSecThreads(this.ns, this.metrics.target);
+  /** Minimize security on a server */
+  async prepareSecurity(): Promise<void> {
+    this.log("Preparing security on target...\n");
+
+    while (!this.metrics.target.secIsPrepped()) {
+      const weakenThreads = getMinSecThreads(this.ns, this.metrics.target);
+      await this.deployPreparation(hackingScripts.Weaken, weakenThreads);
     }
-
-    const task: Task = createTask(this, script, threads);
-    return task;
   }
 
-  // Continously deploy batches
-  async runHackingBatches(): Promise<void> {
+  async deployPreparation(script: string, threads: number): Promise<void> {
+    const job: Job = createJob(this.ns, this.metrics, true, script, threads);
+
+    await this.deploy(this.ns, job);
+
+    // Wait until job finished
+    await this.ns.sleep(Date.now() - job.end);
+  }
+
+  /** Continously creates batches, and deploys them */
+  async run(): Promise<void> {
     // Log start of deployment
-    this.ns.writePort(
-      this.loggerPid,
-      `Deploying batches for ${this.metrics.target.server.hostname}`,
+    this.log(
+      `INFO Deploying batches for ${this.metrics.target.server.hostname}\n`,
     );
 
     while (true) {
-      this.usableServers = getUsableHosts(this.ns);
-
-      const batch: Batch = createBatch(this.ns, this);
-
-      await deploy(this.ns, batch);
-
-      this.metrics.target.update(batch);
-      //If the target changed, it needs to be prepared before use
-      if (this.metrics.checkForNewTarget()) {
-        await this.prepareTarget();
-        break;
+      if (this.metrics.targetChanged()) {
+        await this.startPreparation();
       }
 
+      const job: Job = createJob(this.ns, this.metrics);
+      await this.deploy(this.ns, job);
+
+      // Minimum amount of delay necessary to ensure batches stay in sync
       await this.ns.sleep(this.metrics.taskDelay * 2);
     }
+  }
+
+  async deploy(ns: NS, job: Job): Promise<void> {
+    /*
+    if (!ramEnough(ns, job)) {
+      shrinkJob(ns, job);
+    }
+    */
+
+    // A job can be a single task or a whole batch
+    /*
+    if (isBatch(job.tasks)) {
+      for (const task of job.tasks) {
+        await this.deployTask(task);
+      }
+    } else {
+      await this.deployTask(job.tasks);
+    }
+    */
+
+    this.metrics.target.update(job);
+  }
+
+  async deployTask(task: Task): Promise<void> {
+    while (!this.taskIsDeployed(task)) {
+      this.distributeScripts(task);
+
+      await this.ns.sleep(5);
+    }
+
+    this.log(
+      `INFO Task ${task.taskId} of Batch ${task.batchId} was deployed.\n`,
+    );
+  }
+
+  /**
+   * Distribute a task across hosts
+   * @param task - Task which will be distributed across hosts
+   */
+  distributeScripts(task: Task): void {
+    const hosts: Server[] = getUsableHosts(this.ns);
+    for (const host of hosts) {
+      if (!this.taskIsDeployed(task)) {
+        this.startScript(host.hostname, task);
+      } else {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Checks if a task has been deployed, by checking if there are still threads,
+   * left in the task
+   * @returns If the task has been deployed
+   */
+  taskIsDeployed(task: Task): boolean {
+    return task.threads <= 0;
+  }
+
+  /**
+   * Deploys a task on a host, with as many threads as the host can execute
+   * @param host - Server where task will be executed
+   * @param task - Task which will be deployed
+   */
+  startScript(host: string, task: Task): void {
+    const runnableThreads = calculateRunnableThreads(this.ns, task, host);
+
+    if (runnableThreads > 0) {
+      this.ns.exec(task.script, host, runnableThreads, JSON.stringify(task));
+      task.threads -= runnableThreads;
+    }
+  }
+
+  log(message: string): void {
+    this.ns.writePort(this.loggerPid, message);
   }
 }

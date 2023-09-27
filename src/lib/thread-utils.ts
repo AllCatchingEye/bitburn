@@ -3,14 +3,13 @@ import { Controller } from "/hacking/controller";
 import { Task } from "/hacking/task";
 import { clamp } from "/lib/misc";
 import { Target } from "/hacking/target";
+import { Metrics } from "/hacking/metrics";
 
-export function calculateThreads(ns: NS, controller: Controller): number[] {
-  const hackThreads = getHackThreads(ns, controller);
+export function calculateThreads(ns: NS, metrics: Metrics): number[] {
+  const hackThreads = getHackThreads(ns, metrics);
   const hackWeakenThreads = Math.ceil(hackThreads / 25); // 1x weaken == 25x hacks
-  const growThreads = growthAnalyzeDynamic(
-    ns,
-    controller.metrics.target,
-    1 + controller.stealPercent,
+  const growThreads = Math.floor(
+    growthAnalyzeDynamic(ns, metrics.target, 1 + metrics.greed),
   );
   const growWeakenThreads = Math.ceil(growThreads / 12.5); // 1x grow == 12.5x hacks
 
@@ -25,21 +24,21 @@ export function calculateThreads(ns: NS, controller: Controller): number[] {
 
 // Returns the amount of threads necessary,
 // to grow money to maximum on a provided target
-export function getHackThreads(ns: NS, controller: Controller): number {
+export function getHackThreads(ns: NS, metrics: Metrics): number {
   let hackPercent = 0;
   // If formulas is available use it. Otherwise use less effective alternative
   if (ns.fileExists("Formulas.exe", "home")) {
     // Info required for formulas
     const player = ns.getPlayer();
-    const server = controller.metrics.target.server;
+    const server = metrics.target.server;
 
     hackPercent = ns.formulas.hacking.hackPercent(server, player);
   } else {
-    hackPercent = getHackEffect(ns, controller.metrics.target);
+    hackPercent = getHackEffect(ns, metrics.target);
   }
 
   // Threads need to be whole a number
-  const hackThreads = Math.floor(controller.stealPercent / hackPercent);
+  const hackThreads = Math.floor(metrics.greed / hackPercent);
 
   return hackThreads;
 }
@@ -143,7 +142,7 @@ export function calculateDelays(ns: NS, controller: Controller): number[] {
   // W1: =====    => 0
   //  G:   ====   => W - G + S
   // W2:   =====  => S * 2
-  const taskDelay = controller.taskDelay;
+  const taskDelay = controller.metrics.taskDelay;
   const hackDelay = weakenTime - hackTime - taskDelay;
   const weaken1Delay = 0;
   const growDelay = weakenTime - growTime + taskDelay;
@@ -154,8 +153,13 @@ export function calculateDelays(ns: NS, controller: Controller): number[] {
   return delays;
 }
 
-// Returns the amount of threads necessary,
-// to weaken a server to minimum Security
+/**
+ * Calculates the amount of threads necessary,
+ * to reduce security to the minimum on a target
+ * @param ns - Netscript functions
+ * @param target - The where security should be weakened
+ * @returns Amount of threads necessary to reduce security to the minimum
+ */
 export function getMinSecThreads(ns: NS, target: Target): number {
   const hostname = target.server.hostname;
   const minSec = ns.getServerMinSecurityLevel(hostname);
@@ -175,7 +179,8 @@ export function calculateRunnableThreads(
     getMaxRunnableThreads(ns, task.script, hostname),
     task.threads,
   );
-  return runnableThreadsOnHost;
+
+  return Math.floor(runnableThreadsOnHost);
 }
 
 // Calculates the maximum runnable amount of threads of a script on the provided host

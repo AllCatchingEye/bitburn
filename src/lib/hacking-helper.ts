@@ -1,13 +1,9 @@
 import { NS } from "@ns";
-import { Batch, isBatch } from "/hacking/batch";
+import { Job, isBatch } from "/hacking/job";
 import { Task } from "/hacking/task";
 import { hackingScripts } from "/scripts/Scripts";
 import { getMaxRunnableThreads } from "/lib/thread-utils";
-import {
-  ramEnough,
-  calculateRamCost,
-  calculateAvailableRam,
-} from "/lib/ram-helper";
+import { calculateRamCost, getAvailableRam } from "/lib/ram-helper";
 
 export function distributeScript(
   ns: NS,
@@ -42,42 +38,16 @@ function execute(
   return Math.floor(threads) - runnableThreads;
 }
 
-// Deploys a job.
-// A job can be a single task or a whole batch
-export async function deploy(ns: NS, job: Batch | Task): Promise<void> {
-  if (!ramEnough(ns, job)) {
-    shrinkJob(ns, job);
-  }
+export function shrinkJob(ns: NS, job: Job): void {
+  const availableRam = getAvailableRam(ns);
+  const reduction = availableRam / job.ramCost;
 
-  if (isBatch(job)) {
-    for (const task of job.tasks) {
-      await dispatchWorker(ns, task);
-    }
-  } else {
-    await dispatchWorker(ns, job);
-  }
-}
-
-// Dispatches worker for a task
-export async function dispatchWorker(ns: NS, task: Task): Promise<void> {
-  if (task.threads <= 0) {
-    return;
-  }
-
-  ns.run("hacking/tWorker.js", 1, JSON.stringify(task));
-}
-
-export function shrinkJob(ns: NS, job: Batch | Task): void {
-  const availableRam = calculateAvailableRam(ns);
-  const ramCost = calculateRamCost(ns, job);
-  const reduction = availableRam / ramCost;
-
-  if (isBatch(job)) {
+  if (isBatch(job.tasks)) {
     job.tasks.forEach((task) => {
       shrinkTask(reduction, task);
     });
   } else {
-    shrinkTask(reduction, job);
+    shrinkTask(reduction, job.tasks);
   }
 }
 
