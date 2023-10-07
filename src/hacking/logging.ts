@@ -1,4 +1,5 @@
 import { NS, NetscriptPort } from "@ns";
+import { preventFreeze } from "/lib/misc";
 
 export async function main(ns: NS): Promise<void> {
   const logger: Logger = new Logger(ns);
@@ -19,15 +20,13 @@ export class Logger implements Logger {
   }
 
   async start(): Promise<void> {
-    /*
     await this.ns.write("log.txt", "", "w");
     while (true) {
       await this.log();
 
       // Prevents freeze
-      await this.ns.sleep(5);
+      await preventFreeze(this.ns);
     }
-  */
   }
 
   async log(): Promise<void> {
@@ -37,7 +36,7 @@ export class Logger implements Logger {
       await this.ns.write("log.txt", portData, "a");
 
       // Prevents freeze
-      await this.ns.sleep(5);
+      await preventFreeze(this.ns);
     }
   }
 }

@@ -1,93 +1,139 @@
 import { Server } from "@ns";
-import { hackingScripts, getBatchScripts } from "/scripts/Scripts";
-import { Job } from "/hacking/job";
-import { calculateThreads } from "/lib/thread-utils";
+import { hackingScripts } from "/scripts/Scripts";
 import { Metrics } from "/hacking/metrics";
-import { Target } from "/hacking/target";
-import { calculateTaskRamUsage } from "/lib/ram-helper";
+import { getUsableHosts } from "/lib/searchServers";
+import { Job } from "/hacking/job";
+import { preventFreeze } from "/lib/misc";
 
-export interface Task {
-  target: Server;
-
+export class Task extends Job {
   script: string;
   threads: number;
-  ramCost: number;
 
   time: number;
   end: number;
+  ramCost: number;
 
-  batchId: number;
-  taskId: number;
-  loggerPid: number;
-}
+  constructor(ns: NS, metrics: Metrics, script: string, threads: number) {
+    super(ns, metrics, metrics.nextTaskId);
 
-export function createTasks(ns: NS, metrics: Metrics, batchId: number): Task[] {
-  const scripts: string[] = getBatchScripts();
-  const threads: number[] = calculateThreads(ns, metrics);
+    this.script = script;
+    this.threads = threads;
+    this.ramCost = this.calculateRamCost();
 
-  const tasks: Task[] = [];
-  for (let i = 0; i < scripts.length; i++) {
-    const task = createTask(ns, metrics, batchId, scripts[i], threads[i]);
-    tasks.push(task);
+    this.time = this.calculateTime();
+    this.end = Date.now() - this.time;
   }
 
-  return tasks;
-}
-
-export function createTask(
-  ns: NS,
-  metrics: Metrics,
-  batchId: number,
-  script: string,
-  threads: number,
-): Task {
-  const target: Target = metrics.target;
-  const time = calculateTaskTime(ns, target.server.hostname, script);
-  const task = {
-    target: metrics.target.server,
-
-    script: script,
-    threads: threads,
-    ramCost: calculateTaskRamUsage(ns, script, threads),
-
-    time: time,
-    end: Date.now() - time,
-
-    loggerPid: metrics.loggerPid,
-    taskId: metrics.taskId,
-    batchId: batchId,
-  };
-
-  return task;
-}
-
-export function calculateTaskTime(
-  ns: NS,
-  host: string,
-  script: string,
-): number {
-  const hackTime = ns.getHackTime(host);
-  let taskTime = 0;
-  switch (script) {
-    case hackingScripts.Grow:
-      taskTime = hackTime * 3.2;
-      break;
-    case hackingScripts.Weaken:
-      taskTime = hackTime * 4;
-      break;
-    case hackingScripts.Hacking:
-      taskTime = hackTime;
-      break;
-    default:
-      break;
+  isTask(): this is Task {
+    return this instanceof Task;
   }
 
-  return taskTime;
-}
+  calculateTime(): number {
+    const hackTime = this.ns.getHackTime(this.target.name);
+    let taskTime = 0;
+    switch (this.script) {
+      case hackingScripts.Grow:
+        taskTime = hackTime * 3.2;
+        break;
+      case hackingScripts.Weaken:
+        taskTime = hackTime * 4;
+        break;
+      case hackingScripts.Hacking:
+        taskTime = hackTime;
+        break;
+      default:
+        break;
+    }
 
-export function isTask(job: Job | Task): job is Job {
-  const script = (job as Task).script;
-  const threads = (job as Task).threads;
+    return taskTime;
+  }
 
-  return script !== undefined && threads !== undefined;
+  async deploy(): Promise<void> {
+    while (!this.taskIsDeployed(this)) {
+      this.distributeScripts(this);
+
+      await preventFreeze(this.ns);
+    }
+  }
+
+  /**
+   * Checks if a task has been deployed, by checking if there are still threads,
+   * left in the task
+   * @returns If the task has been deployed
+   */
+  taskIsDeployed(task: Task): boolean {
+    return task.threads <= 0;
+  }
+
+  /**
+   * Deploys a task on a host, with as many threads as the host can execute
+   * @param host - Server where task will be executed
+   * @param task - Task which will be deployed
+   */
+  startScript(host: string, task: Task): void {
+    const runnableThreads = this.calculateRunnableThreads();
+
+    if (runnableThreads > 0) {
+      this.ns.exec(task.script, host, runnableThreads, JSON.stringify(task));
+      task.threads -= runnableThreads;
+    }
+  }
+
+  calculateRunnableThreads(): number {
+    const runnableThreadsOnHost = Math.min(
+      this.getMaxRunnableThreads(),
+      this.threads,
+    );
+
+    return Math.floor(runnableThreadsOnHost);
+  }
+
+  getMaxRunnableThreads(): number {
+    const scriptRamCost = this.ns.getScriptRam(this.script);
+
+    const host = this.target.name;
+    const maxRam = this.ns.getServerMaxRam(host);
+    const usedRam = this.ns.getServerUsedRam(host);
+    const availableRamOnHost = maxRam - usedRam;
+
+    // Thread amount needs to be whole number
+    const maxPossibleThreads = Math.floor(availableRamOnHost / scriptRamCost);
+    return maxPossibleThreads;
+  }
+
+  /**
+   * Distribute a task across hosts
+   * @param task - Task which will be distributed across hosts
+   */
+  distributeScripts(task: Task): void {
+    const hosts: Server[] = getUsableHosts(this.ns);
+    for (const host of hosts) {
+      if (!this.taskIsDeployed(task)) {
+        this.startScript(host.hostname, task);
+      } else {
+        break;
+      }
+    }
+  }
+
+  updateTarget(): void {
+    this.target.update(this);
+  }
+
+  shrink(reduction: number): void {
+    const newThreadCount = this.threads * reduction;
+    if (this.script == hackingScripts.Weaken) {
+      // If the script is weaken, ceil to ensure security wont slowly raise
+      this.threads = Math.ceil(newThreadCount);
+    } else {
+      // Hack and grow will be floored
+      this.threads = Math.floor(newThreadCount);
+    }
+
+    this.ramCost = this.calculateRamCost();
+  }
+
+  calculateRamCost(): number {
+    return this.ns.getScriptRam(this.script) * this.threads;
+  }
 }

@@ -23,12 +23,7 @@ export function getHackingScriptsList(): string[] {
 }
 
 export function getBatchScripts(): string[] {
-  const scripts: string[] = [
-    hackingScripts.Hacking,
-    hackingScripts.Weaken,
-    hackingScripts.Grow,
-    hackingScripts.Weaken,
-  ];
-
+  const scripts = getHackingScriptsList();
+  scripts.push(hackingScripts.Weaken);
   return scripts;
 }

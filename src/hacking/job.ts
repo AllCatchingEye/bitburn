@@ -1,49 +1,23 @@
-import { NS } from "@ns";
-import { Target } from "/hacking/target";
-import { Task, createTasks, createTask } from "/hacking/task";
+import { Target } from "./target";
+import { NS } from "/../NetscriptDefinitions";
 import { Metrics } from "/hacking/metrics";
-import { calculateRamCost } from "/lib/ram-helper";
 
-export interface Job {
+export abstract class Job {
+  ns: NS;
   target: Target;
-  tasks: Task[] | Task;
-  batchId: number;
-  ramCost: number;
-  end: number;
-}
+  id: number;
 
-export function isBatch(tasks: Task[] | Task): tasks is Task[] {
-  return (tasks as Task[]).length !== undefined;
-}
+  abstract end: number;
+  abstract ramCost: number;
 
-export function createJob(
-  ns: NS,
-  metrics: Metrics,
-  prep = false,
-  script = "",
-  threads = 0,
-): Job {
-  const batchId: number = metrics.batchId;
-
-  let tasks: Task[] | Task;
-  let end = 0;
-  if (prep) {
-    tasks = createTask(ns, metrics, batchId, script, threads);
-    end = tasks.end;
-  } else {
-    tasks = createTasks(ns, metrics, batchId);
-    end = tasks[3].end;
+  constructor(ns: NS, metrics: Metrics, id: number) {
+    this.ns = ns;
+    this.target = metrics.target;
+    this.id = id;
   }
 
-  const ramCost = calculateRamCost(ns, tasks);
-
-  const batch: Job = {
-    target: metrics.target,
-    tasks: tasks,
-    batchId: batchId,
-    ramCost: ramCost,
-    end: end,
-  };
-
-  return batch;
+  abstract calculateRamCost(): number;
+  abstract deploy(): void;
+  abstract shrink(reduction: number): void;
+  abstract updateTarget(): void;
 }

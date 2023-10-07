@@ -1,25 +1,18 @@
-import { NS, Server } from "@ns";
-//import { hackingScripts } from "/scripts/Scripts";
+import { NS } from "@ns";
+import { hackingScripts } from "/scripts/Scripts";
 import { Metrics } from "/hacking/metrics";
-//import { Task } from "/hacking/task";
-/*import {
-  getGrowThreads,
-  getMinSecThreads,
-  calculateRunnableThreads,
-} from "/lib/thread-utils";
-*/
-//import { disableLogs } from "/lib/helper-functions";
-//import { Job, isBatch, createJob } from "/hacking/job";
-//import { getUsableHosts } from "/lib/searchServers";
-//import { shrinkJob } from "/lib/hacking-helper";
-//import { ramEnough } from "/lib/ram-helper";
+import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
+import { disableNSLogs } from "/lib/misc";
+import { Deployment } from "/hacking/deployment";
+import { log } from "/lib/misc";
 
 export async function main(ns: NS): Promise<void> {
-  //const functionNames: string[] = ["getServerMaxRam", "scan"];
-  //disableLogs(ns, functionNames);
-  //const loggerPid = ns.args[0] as number;
-  //const controller: Controller = new Controller(ns, loggerPid, 5, 0.05);
-  //await controller.start();
+  const functionNames: string[] = ["getServerMaxRam", "scan"];
+  disableNSLogs(ns, functionNames);
+
+  const loggerPid = ns.args[0] as number;
+  const controller: Controller = new Controller(ns, loggerPid, 5, 0.05);
+  await controller.start();
 }
 
 export class Controller {
@@ -34,9 +27,9 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    //this.log("New controller started...\n");
-    //await this.startPreparation();
-    //await this.run();
+    log(this.ns, "New controller started...\n", this.loggerPid);
+    await this.startPreparation();
+    await this.run();
   }
 
   /**
@@ -45,17 +38,17 @@ export class Controller {
    * 2. Minimizing security
    */
   async startPreparation(): Promise<void> {
-    this.log("Preparing target...\n");
+    log(this.ns, "Preparing target...\n", this.loggerPid);
 
     await this.prepareMoney();
     await this.prepareSecurity();
 
-    this.log("Target has been prepared\n");
+    log(this.ns, "Target has been prepared\n", this.loggerPid);
   }
 
   /** Maximize available money on a server */
   async prepareMoney(): Promise<void> {
-    this.log("Preparing money on target...\n");
+    log(this.ns, "Preparing money on target...\n", this.loggerPid);
 
     while (!this.metrics.target.moneyIsPrepped()) {
       const growThreads = getGrowThreads(this.ns, this.metrics.target);
@@ -65,7 +58,7 @@ export class Controller {
 
   /** Minimize security on a server */
   async prepareSecurity(): Promise<void> {
-    this.log("Preparing security on target...\n");
+    log(this.ns, "Preparing security on target...\n", this.loggerPid);
 
     while (!this.metrics.target.secIsPrepped()) {
       const weakenThreads = getMinSecThreads(this.ns, this.metrics.target);
@@ -74,19 +67,26 @@ export class Controller {
   }
 
   async deployPreparation(script: string, threads: number): Promise<void> {
-    const job: Job = createJob(this.ns, this.metrics, true, script, threads);
+    const deployment: Deployment = new Deployment(
+      this.ns,
+      this.metrics,
+      true,
+      script,
+      threads,
+    );
+    await deployment.start();
 
-    await this.deploy(this.ns, job);
-
-    // Wait until job finished
-    await this.ns.sleep(Date.now() - job.end);
+    // Wait until deployment finished
+    await this.ns.sleep(Date.now() - deployment.end);
   }
 
   /** Continously creates batches, and deploys them */
   async run(): Promise<void> {
     // Log start of deployment
-    this.log(
+    log(
+      this.ns,
       `INFO Deploying batches for ${this.metrics.target.server.hostname}\n`,
+      this.loggerPid,
     );
 
     while (true) {
@@ -94,86 +94,11 @@ export class Controller {
         await this.startPreparation();
       }
 
-      const job: Job = createJob(this.ns, this.metrics);
-      await this.deploy(this.ns, job);
+      const deployment: Deployment = new Deployment(this.ns, this.metrics);
+      await deployment.start();
 
       // Minimum amount of delay necessary to ensure batches stay in sync
       await this.ns.sleep(this.metrics.taskDelay * 2);
     }
-  }
-
-  async deploy(ns: NS, job: Job): Promise<void> {
-    /*
-    if (!ramEnough(ns, job)) {
-      shrinkJob(ns, job);
-    }
-    */
-
-    // A job can be a single task or a whole batch
-    /*
-    if (isBatch(job.tasks)) {
-      for (const task of job.tasks) {
-        await this.deployTask(task);
-      }
-    } else {
-      await this.deployTask(job.tasks);
-    }
-    */
-
-    this.metrics.target.update(job);
-  }
-
-  async deployTask(task: Task): Promise<void> {
-    while (!this.taskIsDeployed(task)) {
-      this.distributeScripts(task);
-
-      await this.ns.sleep(5);
-    }
-
-    this.log(
-      `INFO Task ${task.taskId} of Batch ${task.batchId} was deployed.\n`,
-    );
-  }
-
-  /**
-   * Distribute a task across hosts
-   * @param task - Task which will be distributed across hosts
-   */
-  distributeScripts(task: Task): void {
-    const hosts: Server[] = getUsableHosts(this.ns);
-    for (const host of hosts) {
-      if (!this.taskIsDeployed(task)) {
-        this.startScript(host.hostname, task);
-      } else {
-        break;
-      }
-    }
-  }
-
-  /**
-   * Checks if a task has been deployed, by checking if there are still threads,
-   * left in the task
-   * @returns If the task has been deployed
-   */
-  taskIsDeployed(task: Task): boolean {
-    return task.threads <= 0;
-  }
-
-  /**
-   * Deploys a task on a host, with as many threads as the host can execute
-   * @param host - Server where task will be executed
-   * @param task - Task which will be deployed
-   */
-  startScript(host: string, task: Task): void {
-    const runnableThreads = calculateRunnableThreads(this.ns, task, host);
-
-    if (runnableThreads > 0) {
-      this.ns.exec(task.script, host, runnableThreads, JSON.stringify(task));
-      task.threads -= runnableThreads;
-    }
-  }
-
-  log(message: string): void {
-    this.ns.writePort(this.loggerPid, message);
   }
 }

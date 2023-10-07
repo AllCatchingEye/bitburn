@@ -1,5 +1,5 @@
 import { NS, Server } from "@ns";
-import { Job, isBatch } from "/hacking/job";
+import { Deployment } from "/hacking/deployment";
 import { Task } from "/hacking/task";
 import { hackingScripts } from "/scripts/Scripts";
 
@@ -8,6 +8,8 @@ export interface Target {
   ns: NS;
 
   server: Server;
+
+  name: string;
 
   /** How much money currently resides on the server and can be hacked */
   moneyAvailable: number;
@@ -21,7 +23,7 @@ export interface Target {
   /** Minimum server security level that this server can be weakened to */
   minDifficulty: number;
 
-  update(job: Job): void;
+  updateJob(job: Deployment): void;
   hackUpdate(threads: number): void;
   weakenUpdate(threads: number): void;
   growUpdate(threads: number): void;
@@ -39,6 +41,7 @@ export class Target implements Target {
   constructor(ns: NS, server: Server) {
     this.ns = ns;
     this.server = server;
+    this.name = server.hostname;
     this.moneyAvailable = server.moneyAvailable ?? 0;
     this.moneyMax = server.moneyMax ?? 0;
     this.hackDifficulty = server.hackDifficulty ?? 0;
@@ -46,23 +49,11 @@ export class Target implements Target {
   }
 
   /**
-   * Updates the target for either a whole batch or a single task
-   * @param job - If a batch or single task was executed
-   */
-  update(job: Job): void {
-    if (isBatch(job.tasks)) {
-      job.tasks.forEach((task) => this.determineUpdateType(task));
-    } else {
-      this.determineUpdateType(job.tasks);
-    }
-  }
-
-  /**
    * Determines which type of update should be executed and executes it,
    * based on the script used in task
    * @param task - Task which was executed
    */
-  determineUpdateType(task: Task): void {
+  update(task: Task): void {
     switch (task.script) {
       case hackingScripts.Hacking:
         this.hackUpdate(task.threads);

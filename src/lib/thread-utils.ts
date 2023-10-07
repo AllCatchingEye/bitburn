@@ -1,6 +1,5 @@
 import { NS } from "@ns";
 import { Controller } from "/hacking/controller";
-import { Task } from "/hacking/task";
 import { clamp } from "/lib/misc";
 import { Target } from "/hacking/target";
 import { Metrics } from "/hacking/metrics";
@@ -168,34 +167,4 @@ export function getMinSecThreads(ns: NS, target: Target): number {
 
   const weakenThreads = Math.abs(sec - minSec) / weakenEffect;
   return Math.ceil(weakenThreads); // Only whole threads exist
-}
-
-export function calculateRunnableThreads(
-  ns: NS,
-  task: Task,
-  hostname: string,
-): number {
-  const runnableThreadsOnHost = Math.min(
-    getMaxRunnableThreads(ns, task.script, hostname),
-    task.threads,
-  );
-
-  return Math.floor(runnableThreadsOnHost);
-}
-
-// Calculates the maximum runnable amount of threads of a script on the provided host
-export function getMaxRunnableThreads(
-  ns: NS,
-  script: string,
-  hostname: string,
-): number {
-  const scriptRamCost = ns.getScriptRam(script);
-
-  const maxRam = ns.getServerMaxRam(hostname);
-  const usedRam = ns.getServerUsedRam(hostname);
-  const availableRamOnHost = maxRam - usedRam;
-
-  // Thread amount needs to be whole number
-  const maxPossibleThreads = Math.floor(availableRamOnHost / scriptRamCost);
-  return maxPossibleThreads;
 }
