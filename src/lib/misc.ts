@@ -1,3 +1,5 @@
+import { NS } from "/../NetscriptDefinitions";
+
 // Simple clamp function
 export function clamp(val: number, min: number, max: number): number {
   const clampedVal = Math.min(max, Math.max(min, val));
@@ -14,6 +16,10 @@ export function disableNSLogs(ns: NS, functionNames: string[]): void {
   });
 }
 
-export function log(ns: NS, message: string, loggerPid: number): void {
-  ns.writePort(loggerPid, message);
+export async function log(
+  ns: NS,
+  message: string,
+  loggerPid: number,
+): Promise<void> {
+  //await ns.writePort(loggerPid, message);
 }

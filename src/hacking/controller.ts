@@ -2,7 +2,7 @@ import { NS } from "@ns";
 import { hackingScripts } from "/scripts/Scripts";
 import { Metrics } from "/hacking/metrics";
 import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
-import { disableNSLogs } from "/lib/misc";
+import { disableNSLogs, preventFreeze } from "/lib/misc";
 import { Deployment } from "/hacking/deployment";
 import { log } from "/lib/misc";
 
@@ -27,7 +27,7 @@ export class Controller {
   }
 
   async start(): Promise<void> {
-    log(this.ns, "New controller started...\n", this.loggerPid);
+    await log(this.ns, "New controller started...\n", this.loggerPid);
     await this.startPreparation();
     await this.run();
   }
@@ -38,31 +38,35 @@ export class Controller {
    * 2. Minimizing security
    */
   async startPreparation(): Promise<void> {
-    log(this.ns, "Preparing target...\n", this.loggerPid);
+    await log(this.ns, "Preparing target...\n", this.loggerPid);
 
     await this.prepareMoney();
     await this.prepareSecurity();
 
-    log(this.ns, "Target has been prepared\n", this.loggerPid);
+    await log(this.ns, "Target has been prepared\n", this.loggerPid);
   }
 
   /** Maximize available money on a server */
   async prepareMoney(): Promise<void> {
-    log(this.ns, "Preparing money on target...\n", this.loggerPid);
+    await log(this.ns, "Preparing money on target...\n", this.loggerPid);
 
     while (!this.metrics.target.moneyIsPrepped()) {
       const growThreads = getGrowThreads(this.ns, this.metrics.target);
       await this.deployPreparation(hackingScripts.Grow, growThreads);
+
+      await preventFreeze(this.ns);
     }
   }
 
   /** Minimize security on a server */
   async prepareSecurity(): Promise<void> {
-    log(this.ns, "Preparing security on target...\n", this.loggerPid);
+    await log(this.ns, "Preparing security on target...\n", this.loggerPid);
 
     while (!this.metrics.target.secIsPrepped()) {
       const weakenThreads = getMinSecThreads(this.ns, this.metrics.target);
       await this.deployPreparation(hackingScripts.Weaken, weakenThreads);
+
+      await preventFreeze(this.ns);
     }
   }
 
@@ -83,7 +87,7 @@ export class Controller {
   /** Continously creates batches, and deploys them */
   async run(): Promise<void> {
     // Log start of deployment
-    log(
+    await log(
       this.ns,
       `INFO Deploying batches for ${this.metrics.target.server.hostname}\n`,
       this.loggerPid,

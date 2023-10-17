@@ -33,9 +33,11 @@ export class Task extends Job {
     let taskTime = 0;
     switch (this.script) {
       case hackingScripts.Grow:
+        // The time of one grow call is equal to 3.2 hack calls
         taskTime = hackTime * 3.2;
         break;
       case hackingScripts.Weaken:
+        // The time of one weaken call is equal to 4 hack calls
         taskTime = hackTime * 4;
         break;
       case hackingScripts.Hacking:
@@ -49,7 +51,7 @@ export class Task extends Job {
   }
 
   async deploy(): Promise<void> {
-    while (!this.taskIsDeployed(this)) {
+    while (this.threads > 0) {
       this.distributeScripts(this);
 
       await preventFreeze(this.ns);
@@ -57,41 +59,31 @@ export class Task extends Job {
   }
 
   /**
-   * Checks if a task has been deployed, by checking if there are still threads,
-   * left in the task
-   * @returns If the task has been deployed
-   */
-  taskIsDeployed(task: Task): boolean {
-    return task.threads <= 0;
-  }
-
-  /**
    * Deploys a task on a host, with as many threads as the host can execute
    * @param host - Server where task will be executed
    * @param task - Task which will be deployed
    */
-  startScript(host: string, task: Task): void {
-    const runnableThreads = this.calculateRunnableThreads();
+  startScript(host: string): void {
+    const runnableThreads = Math.max(0, this.calculateRunnableThreads(host));
 
     if (runnableThreads > 0) {
-      this.ns.exec(task.script, host, runnableThreads, JSON.stringify(task));
-      task.threads -= runnableThreads;
+      this.ns.exec(this.script, host, runnableThreads, JSON.stringify(this));
+      this.threads -= runnableThreads;
     }
   }
 
-  calculateRunnableThreads(): number {
+  calculateRunnableThreads(host: string): number {
     const runnableThreadsOnHost = Math.min(
-      this.getMaxRunnableThreads(),
+      this.getMaxRunnableThreads(host),
       this.threads,
     );
 
     return Math.floor(runnableThreadsOnHost);
   }
 
-  getMaxRunnableThreads(): number {
+  getMaxRunnableThreads(host: string): number {
     const scriptRamCost = this.ns.getScriptRam(this.script);
 
-    const host = this.target.name;
     const maxRam = this.ns.getServerMaxRam(host);
     const usedRam = this.ns.getServerUsedRam(host);
     const availableRamOnHost = maxRam - usedRam;
@@ -108,7 +100,7 @@ export class Task extends Job {
   distributeScripts(task: Task): void {
     const hosts: Server[] = getUsableHosts(this.ns);
     for (const host of hosts) {
-      if (!this.taskIsDeployed(task)) {
+      if (this.threads > 0) {
         this.startScript(host.hostname, task);
       } else {
         break;

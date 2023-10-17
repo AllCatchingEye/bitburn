@@ -55,8 +55,7 @@ export class Deployment {
       this.resize();
     }
 
-    this.job.deploy();
-    this.metrics.target.updateJob(this);
+    await this.job.deploy();
   }
 
   ramEnough(): boolean {

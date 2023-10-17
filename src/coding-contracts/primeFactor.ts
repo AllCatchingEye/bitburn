@@ -1,6 +1,6 @@
 import { NS } from "/../NetscriptDefinitions";
 
-export async function main(ns: NS) {
+export async function main(ns: NS): Promise<void> {
   const n = ns.args[0] as number;
   const biggestPrimeFactor = primeFactor(n);
   ns.tprint(biggestPrimeFactor);

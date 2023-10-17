@@ -14,7 +14,7 @@ export interface CC {
   reward: string;
 }
 
-export async function main(ns: NS) {
+export async function main(ns: NS): Promise<void> {
   const filename = "";
   const ccType = ns.codingcontract.getContractType(filename);
   const solution = getSolution(ns, filename, ccType);
@@ -23,9 +23,10 @@ export async function main(ns: NS) {
 
 export function getSolution(ns: NS, filename: string, type: string): number {
   let solution = 0;
+  let stockPrices = [];
   switch (type) {
     case CCTypes.StockTrader1:
-      const stockPrices = ns.codingcontract.getData(filename);
+      stockPrices = ns.codingcontract.getData(filename);
       solution = getBestTradeI(stockPrices);
       break;
     default:

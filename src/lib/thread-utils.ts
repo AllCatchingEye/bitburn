@@ -3,6 +3,7 @@ import { Controller } from "/hacking/controller";
 import { clamp } from "/lib/misc";
 import { Target } from "/hacking/target";
 import { Metrics } from "/hacking/metrics";
+import { hackingScripts } from "/scripts/Scripts";
 
 export function calculateThreads(ns: NS, metrics: Metrics): number[] {
   const hackThreads = getHackThreads(ns, metrics);

@@ -1,5 +1,4 @@
 import { NS, Server } from "@ns";
-import { Deployment } from "/hacking/deployment";
 import { Task } from "/hacking/task";
 import { hackingScripts } from "/scripts/Scripts";
 
@@ -23,7 +22,7 @@ export interface Target {
   /** Minimum server security level that this server can be weakened to */
   minDifficulty: number;
 
-  updateJob(job: Deployment): void;
+  update(task: Task): void;
   hackUpdate(threads: number): void;
   weakenUpdate(threads: number): void;
   growUpdate(threads: number): void;
@@ -183,8 +182,8 @@ export class Target implements Target {
    * @returns If the server is prepared for batching
    */
   isPrepped(): boolean {
-    const moneyPrepped = this.moneyAvailableIsPrepped();
-    const secPrepped = this.hackDifficultyIsPrepped();
+    const moneyPrepped = this.moneyIsPrepped();
+    const secPrepped = this.secIsPrepped();
     const isPrepped = moneyPrepped && secPrepped;
 
     return isPrepped;
@@ -194,7 +193,7 @@ export class Target implements Target {
    * Checks if the money of the target lies at maximum for batching
    * @returns If the money is prepared
    */
-  moneyAvailableIsPrepped(): boolean {
+  moneyIsPrepped(): boolean {
     const moneyIsPrepped = this.moneyAvailable === this.moneyMax;
     return moneyIsPrepped;
   }
@@ -203,7 +202,7 @@ export class Target implements Target {
    * Checks if the security of the target is a the minimum for batching
    * @returns If the security is prepared
    */
-  hackDifficultyIsPrepped(): boolean {
+  secIsPrepped(): boolean {
     const secToFix = Math.abs(this.hackDifficulty - this.minDifficulty);
 
     const tolerance = 0.0001; // Fix for floating point accuracy

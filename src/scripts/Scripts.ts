@@ -1,7 +1,7 @@
 export enum hackingScripts {
-  Hacking = "/scripts/hack.js",
-  Grow = "/scripts/grow.js",
-  Weaken = "/scripts/weaken.js",
+  Hacking = "scripts/hack.js",
+  Grow = "scripts/grow.js",
+  Weaken = "scripts/weaken.js",
 }
 
 export enum startupScripts {

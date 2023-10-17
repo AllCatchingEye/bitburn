@@ -1,11 +1,12 @@
-import { Target } from "./target";
 import { NS } from "/../NetscriptDefinitions";
 import { Metrics } from "/hacking/metrics";
+import { Target } from "/hacking/target";
 
 export abstract class Job {
   ns: NS;
   target: Target;
   id: number;
+  loggerPid: number;
 
   abstract end: number;
   abstract ramCost: number;
@@ -14,6 +15,7 @@ export abstract class Job {
     this.ns = ns;
     this.target = metrics.target;
     this.id = id;
+    this.loggerPid = metrics.loggerPid;
   }
 
   abstract calculateRamCost(): number;

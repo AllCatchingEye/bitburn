@@ -9,11 +9,9 @@ export class Batch extends Job {
   tasks: Task[];
   ramCost: number;
   end: number;
-  loggerPid: number;
 
   constructor(ns: NS, metrics: Metrics) {
     super(ns, metrics, metrics.nextBatchId);
-    this.loggerPid = metrics.loggerPid;
     const scripts: string[] = getBatchScripts();
     const threads: number[] = calculateThreads(ns, metrics);
 
@@ -41,7 +39,7 @@ export class Batch extends Job {
     for (const task of this.tasks) {
       await task.deploy();
 
-      log(
+      await log(
         this.ns,
         `INFO Task ${task.id} of Batch ${this.id} was deployed.\n`,
         this.loggerPid,
