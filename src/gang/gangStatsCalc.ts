@@ -1,5 +1,14 @@
 import { NS, GangMemberInfo, GangTaskStats } from '@ns';
 
+/**
+ * Calculates the respect gain for a gang member performing a specific task.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {number} gangSoftcap - A value representing the gang's respect softcap, used in calculations.
+ * @param {GangMemberInfo} member - The information about the gang member performing the task.
+ * @param {GangTaskStats} task - The statistics of the task being performed.
+ * @returns {number} - The calculated respect gain from the task.
+ */
 export function calculateTaskRespectGain(
   ns: NS,
   gangSoftcap: number,
@@ -29,6 +38,14 @@ export function calculateTaskRespectGain(
   return taskRespectGain;
 }
 
+/**
+ * Calculates the wanted level gain for a gang member performing a specific task.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {GangMemberInfo} member - The information about the gang member performing the task.
+ * @param {GangTaskStats} task - The statistics of the task being performed.
+ * @returns {number} - The calculated wanted level gain from the task.
+ */
 export function calculateWantedLevelGain(ns: NS, member: GangMemberInfo, task: GangTaskStats): number {
   if (task.baseWanted === 0) return 0;
 
@@ -55,6 +72,15 @@ export function calculateWantedLevelGain(ns: NS, member: GangMemberInfo, task: G
   return Math.min(100, calc);
 }
 
+/**
+ * Calculates the money gain for a gang member performing a specific task.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {number} gangSoftcap - A value representing the gang's money softcap, used in calculations.
+ * @param {GangMemberInfo} member - The information about the gang member performing the task.
+ * @param {GangTaskStats} task - The statistics of the task being performed.
+ * @returns {number} - The calculated money gain from the task.
+ */
 export function calculateTaskMoneyGain(
   ns: NS,
   gangSoftcap: number,
@@ -85,6 +111,12 @@ export function calculateTaskMoneyGain(
   return moneyGain;
 }
 
+/**
+ * Calculates the penalty applied to gang activities based on the gang's wanted level.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @returns {number} - The calculated penalty factor affecting gang activities.
+ */
 function calculateWantedPenalty(ns: NS): number {
   const gangInfo = ns.gang.getGangInformation();
   return gangInfo.respect / (gangInfo.respect + gangInfo.wantedLevel);

@@ -1,5 +1,13 @@
 import { NS, GangMemberInfo } from '@ns';
 
+/**
+ * Determines whether a gang member should ascend based on their current multipliers
+ * and earned respect relative to the gang's total respect.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {GangMemberInfo} member - The information about the gang member being evaluated.
+ * @returns {boolean} - True if the gang member should ascend, false otherwise.
+ */
 export function shouldAscend(ns: NS, member: GangMemberInfo) {
   const ascensionTreshold: number = calculateAscendTreshold(member);
   const ascensionMultiplier = calculateAscensionMultiplier(ns, member);
@@ -8,16 +16,29 @@ export function shouldAscend(ns: NS, member: GangMemberInfo) {
   return ascensionMultiplier >= ascensionTreshold && member.earnedRespect < gangRespect;
 }
 
-function calculateAscendTreshold(member: GangMemberInfo) {
+/**
+ * Calculates the threshold multiplier for a gang member to be eligible for ascension.
+ *
+ * @param {GangMemberInfo} member - The information about the gang member being evaluated.
+ * @returns {number} - The calculated ascension threshold multiplier.
+ */
+function calculateAscendTreshold(member: GangMemberInfo): number {
   const mult = getSmallestMultiplier(member);
 
-  // Got the formula from discord
-  // Calculates the best ascension multiplier
+  // The formula is derived from community discussion to estimate the optimal ascension threshold.
   const asc_tresh = 1.66 - 0.62 / Math.exp((2 / mult) ** 2.24);
   return asc_tresh;
 }
 
-function calculateAscensionMultiplier(ns: NS, member: GangMemberInfo) {
+/**
+ * Calculates the average ascension multiplier increase for a gang member
+ * based on their potential stat gains after ascension.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {GangMemberInfo} member - The information about the gang member being evaluated.
+ * @returns {number} - The average ascension multiplier increase.
+ */
+function calculateAscensionMultiplier(ns: NS, member: GangMemberInfo): number {
   const memberAscension = ns.gang.getAscensionResult(member.name);
 
   // const hackMult = memberAscension?.hack ?? 0;
@@ -35,14 +56,20 @@ function calculateAscensionMultiplier(ns: NS, member: GangMemberInfo) {
   return avgMult;
 }
 
-function getSmallestMultiplier(member: GangMemberInfo) {
-  const strMult = member.str_mult;
-  const defMult = member.def_mult;
-  const agiMult = member.agi_mult;
-  const dexMult = member.dex_mult;
-  const chaMult = member.cha_mult;
-
-  const smallestMult = Math.min(strMult, defMult, agiMult, dexMult, chaMult);
-
-  return smallestMult;
+/**
+ * Gets the smallest current stat multiplier of a gang member.
+ * This is used to calculate the ascension threshold.
+ *
+ * @param {GangMemberInfo} member - The information about the gang member being evaluated.
+ * @returns {number} - The smallest stat multiplier of the gang member.
+ */
+function getSmallestMultiplier(member: GangMemberInfo): number {
+// Find and return the smallest multiplier among the member's stats.
+  return Math.min(
+      member.str_mult,
+      member.def_mult,
+      member.agi_mult,
+      member.dex_mult,
+      member.cha_mult
+  );
 }
