@@ -2,6 +2,12 @@ import { getRunnableServers } from '@/servers/server-search';
 import { getTotalMaxRam } from '@/utility/utility-functions';
 import { NS } from '@ns';
 
+/**
+ * Main function that continuously monitors the available RAM across all servers
+ * and starts specified scripts when conditions are met.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ */
 export async function main(ns: NS) {
   const hackScripts = ['hacking/controller.js', 'servers/server-prepper.js', 'servers/server-upgrader.js'];
   const gangScripts = ['gang/recruiter.js', 'gang/gang.js'];
@@ -13,6 +19,13 @@ export async function main(ns: NS) {
   }
 }
 
+/**
+ * Starts the given scripts if they are not already running.
+ *
+ * @param {NS} ns - The Netscript environment object providing access to game functions.
+ * @param {string[]} scripts - An array of script file paths to start.
+ */
 function startScripts(ns: NS, scripts: string[]) {
-  scripts.filter((script) => !ns.isRunning(script)).forEach((script) => ns.run(script));
+  const scriptsNotRunning = scripts.filter((script) => !ns.isRunning(script));
+  scriptsNotRunning.forEach((script) => ns.run(script));
 }
