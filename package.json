@@ -1,29 +1,21 @@
 {
-  "name": "bitburner-typescript-template",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "viteburner-template",
+  "version": "0.0.0",
   "scripts": {
-    "watch": "npx tsc -w",
-    "lint": "eslint . --ext .ts",
-    "defs": "node ./updateDefs.js"
+    "dev": "viteburner"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bitburner-official/vscode-template.git"
-  },
-  "author": "SlyCedix",
-  "bugs": {
-    "url": "https://github.com/bitburner-official/vscode-template/issues"
-  },
-  "homepage": "https://github.com/bitburner-official/vscode-template#readme",
+  "author": "Tanimodori",
   "devDependencies": {
-    "@types/lodash": "^4.14.178",
-    "@types/node": "^16.4.3",
-    "@typescript-eslint/eslint-plugin": "^4.28.4",
-    "@typescript-eslint/parser": "^4.28.4",
-    "eslint": "^7.31.0",
-    "ts-node": "^9.1.1",
-    "typescript": "^4.3.5"
-  }
+    "@types/node": "^18.15.3",
+    "@typescript-eslint/eslint-plugin": "^5.55.0",
+    "@typescript-eslint/parser": "^5.55.0",
+    "eslint": "^8.36.0",
+    "eslint-config-prettier": "^8.7.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.8.4",
+    "typescript": "^4.9.5",
+    "vite": "^4.1.4",
+    "viteburner": "^0.5.3"
+  },
+  "license": "MIT"
 }

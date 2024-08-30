@@ -1,108 +1,95 @@
-import { NS } from "@ns";
-import { hackingScripts } from "/scripts/Scripts";
-import { Metrics } from "/hacking/metrics";
-import { getGrowThreads, getMinSecThreads } from "/lib/thread-utils";
-import { disableNSLogs, preventFreeze } from "/lib/misc";
-import { Deployment } from "/hacking/deployment";
-import { log } from "/lib/misc";
+import { NS } from '@ns';
+import { getMostProfitableServer, getRunnableServers } from '../servers/server-search';
+import { getAvailableRam, getTotalMaxRam } from '../utility/utility-functions';
+import { Deployer } from './deployer';
+import { Batch } from './batch';
+import { log } from '@/logger/logger';
+import { getRamCostThreads } from './threads';
 
-export async function main(ns: NS): Promise<void> {
-  const functionNames: string[] = ["getServerMaxRam", "scan"];
-  disableNSLogs(ns, functionNames);
+export type Job = {
+  script: string;
+  target: string;
+  threads: number;
+  delay: number;
+};
 
-  const loggerPid = ns.args[0] as number;
-  const controller: Controller = new Controller(ns, loggerPid, 5, 0.05);
-  await controller.start();
+export async function main(ns: NS) {
+  //log(ns, 'batcher.txt', 'Started controller\n', 'w');
+  let target = getMostProfitableServer(ns, getRunnableServers(ns));
+  const delay = 5;
+  const deployer = new Deployer(ns, target, delay);
+
+  while (true) {
+    const pidServerMap = spawnWorkers(ns);
+
+    const nextTarget = getNextTarget(ns, target);
+    if (target != nextTarget) {
+      //log(ns, 'batcher.txt', `Target changed, create new simulated server\n`, 'a');
+      target = nextTarget;
+      deployer.changeTarget(nextTarget);
+    }
+
+    const hackPercentage = 0.1;
+    const batch = createBatch(hackPercentage, deployer);
+    if (batchFits(ns, batch)) {
+      deployer.executeBatch(batch, pidServerMap);
+    }
+
+    await ns.sleep(delay);
+  }
 }
 
-export class Controller {
-  ns: NS;
-  metrics: Metrics;
-  loggerPid: number;
+function spawnWorkers(ns: NS) {
+  const servers = getRunnableServers(ns);
+  const pidServerMap = new Map<string, number>();
 
-  constructor(ns: NS, loggerPid: number, delay: number, greed: number) {
-    this.ns = ns;
-    this.loggerPid = loggerPid;
-    this.metrics = new Metrics(this.ns, delay, greed, loggerPid);
-  }
-
-  async start(): Promise<void> {
-    await log(this.ns, "New controller started...\n", this.loggerPid);
-    await this.startPreparation();
-    await this.run();
-  }
-
-  /**
-   * Will prepare the server by
-   * 1. Maximizing money
-   * 2. Minimizing security
-   */
-  async startPreparation(): Promise<void> {
-    await log(this.ns, "Preparing target...\n", this.loggerPid);
-
-    await this.prepareMoney();
-    await this.prepareSecurity();
-
-    await log(this.ns, "Target has been prepared\n", this.loggerPid);
-  }
-
-  /** Maximize available money on a server */
-  async prepareMoney(): Promise<void> {
-    await log(this.ns, "Preparing money on target...\n", this.loggerPid);
-
-    while (!this.metrics.target.moneyIsPrepped()) {
-      const growThreads = getGrowThreads(this.ns, this.metrics.target);
-      await this.deployPreparation(hackingScripts.Grow, growThreads);
-
-      await preventFreeze(this.ns);
+  for (const server of servers) {
+    let pid;
+    if (ns.isRunning('hacking/worker.js', server)) {
+      const workerScript = ns.getRunningScript('hacking/worker.js', server);
+      pid = workerScript?.pid;
+    } else {
+      pid = ns.exec('hacking/worker.js', server);
     }
+
+    pid = pid ?? 0;
+    if (pid != 0) pidServerMap.set(server, pid);
   }
 
-  /** Minimize security on a server */
-  async prepareSecurity(): Promise<void> {
-    await log(this.ns, "Preparing security on target...\n", this.loggerPid);
+  return pidServerMap;
+}
 
-    while (!this.metrics.target.secIsPrepped()) {
-      const weakenThreads = getMinSecThreads(this.ns, this.metrics.target);
-      await this.deployPreparation(hackingScripts.Weaken, weakenThreads);
+function getNextTarget(ns: NS, currentTarget: string) {
+  const runnableServers = getRunnableServers(ns);
+  const totalMaxRam = getTotalMaxRam(ns, runnableServers);
+  const nextTarget = getMostProfitableServer(ns, runnableServers);
 
-      await preventFreeze(this.ns);
-    }
+  //log(ns, 'batcher.txt', `Total ram available ${totalMaxRam}\n`, 'a');
+  //log(ns, 'batcher.txt', `currentTarget target: ${currentTarget}\n`, 'a');
+  //log(ns, 'batcher.txt', `Next target: ${nextTarget}\n`, 'a');
+
+  return nextTarget;
+}
+
+function createBatch(hackPercentage: number, deployer: Deployer) {
+  let batch;
+  if (!deployer.simulation.server.isPrepped) {
+    batch = deployer.simulation.planPrepBatch();
+  } else {
+    batch = deployer.simulation.planBatch(hackPercentage);
   }
 
-  async deployPreparation(script: string, threads: number): Promise<void> {
-    const deployment: Deployment = new Deployment(
-      this.ns,
-      this.metrics,
-      true,
-      script,
-      threads,
-    );
-    await deployment.start();
+  return batch;
+}
 
-    // Wait until deployment finished
-    await this.ns.sleep(Date.now() - deployment.end);
-  }
+function batchFits(ns: NS, batch: Batch) {
+  const runnableServers = getRunnableServers(ns);
+  const availableRam = getAvailableRam(ns, runnableServers);
+  const batchRamCost = getRamCostThreads(ns, batch.threads);
+  const batchFits = batchRamCost <= availableRam;
 
-  /** Continously creates batches, and deploys them */
-  async run(): Promise<void> {
-    // Log start of deployment
-    await log(
-      this.ns,
-      `INFO Deploying batches for ${this.metrics.target.server.hostname}\n`,
-      this.loggerPid,
-    );
+  //log(ns, 'batcher.txt', `Available ram: ${availableRam}\n`, 'a');
+  //log(ns, 'batcher.txt', `Batch ram cost: ${batchRamCost}\n`, 'a');
 
-    while (true) {
-      if (this.metrics.targetChanged()) {
-        await this.startPreparation();
-      }
-
-      const deployment: Deployment = new Deployment(this.ns, this.metrics);
-      await deployment.start();
-
-      // Minimum amount of delay necessary to ensure batches stay in sync
-      await this.ns.sleep(this.metrics.taskDelay * 2);
-    }
-  }
+  return batchFits;
 }

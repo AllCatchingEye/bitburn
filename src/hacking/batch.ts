@@ -1,63 +1,33 @@
-import { getBatchScripts } from "/scripts/Scripts";
-import { calculateThreads } from "/lib/thread-utils";
-import { Metrics } from "/hacking/metrics";
-import { Job } from "/hacking/job";
-import { Task } from "/hacking/task";
-import { log } from "/lib/misc";
+import { log } from '@/logger/logger';
+import { getRunnableServers } from '@/servers/server-search';
+import { NS } from '@ns';
+import { getAvailableRam } from '../utility/utility-functions';
+import { Delays } from './delays';
+import { Threads, getRamCostThreads, logThreads } from './threads';
 
-export class Batch extends Job {
-  tasks: Task[];
-  ramCost: number;
-  end: number;
+export interface Batch {
+  threads: Threads;
+  delays: Delays;
+}
 
-  constructor(ns: NS, metrics: Metrics) {
-    super(ns, metrics, metrics.nextBatchId);
-    const scripts: string[] = getBatchScripts();
-    const threads: number[] = calculateThreads(ns, metrics);
+export function batchHasEnoughRam(ns: NS, batch: Batch) {
+  const servers = getRunnableServers(ns);
+  const availableRam = getAvailableRam(ns, servers);
+  const batchRamCost = getRamCostThreads(ns, batch.threads);
+  return availableRam < batchRamCost;
+}
 
-    this.tasks = [];
-    for (let i = 0; i < scripts.length; i++) {
-      const task = new Task(ns, metrics, scripts[i], threads[i]);
-      this.tasks.push(task);
-    }
+export function resizeBatch(ns: NS, threads: Threads) {
+  const servers = getRunnableServers(ns);
+  const availableRam = getAvailableRam(ns, servers);
+  const batchRamCost = getRamCostThreads(ns, threads);
 
-    this.end = this.tasks[-1].end;
-    this.ramCost = this.calculateRamCost();
-  }
+  const resizePercent = availableRam / batchRamCost;
+  //log(ns, 'Batcher.txt', `PrepBatch too big with ${batchRamCost}`, 'a');
+  //log(ns, 'Batcher.txt', `Batch too big, reduce size of batch to ${resizePercent}\n`, 'a');
 
-  isBatch(): this is Batch {
-    return this instanceof Batch;
-  }
+  threads.grow = Math.floor(threads.grow * resizePercent);
+  threads.weakenGrow = Math.ceil(threads.weakenGrow * resizePercent);
 
-  calculateTime(): number {
-    let time = 0;
-    this.tasks.forEach((task) => (time += task.time));
-    return time;
-  }
-
-  async deploy(): Promise<void> {
-    for (const task of this.tasks) {
-      await task.deploy();
-
-      await log(
-        this.ns,
-        `INFO Task ${task.id} of Batch ${this.id} was deployed.\n`,
-        this.loggerPid,
-      );
-    }
-  }
-
-  updateTarget(): void {
-    this.tasks.forEach((task) => this.target.update(task));
-  }
-
-  shrink(reduction: number): void {
-    this.tasks.forEach((task) => task.shrink(reduction));
-  }
-
-  calculateRamCost(): number {
-    let ramCost = 0;
-    this.tasks.forEach((task) => (ramCost += task.ramCost));
-    return ramCost;
-  }
+  //logThreads(ns, threads);
 }
