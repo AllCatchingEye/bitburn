@@ -6,6 +6,9 @@ import { Batch } from './batch';
 import { log } from '@/logger/logger';
 import { getRamCostThreads } from './threads';
 
+/**
+ * Represents a job to be executed, including the script, target server, number of threads, and delay.
+ */
 export type Job = {
   script: string;
   target: string;
@@ -13,6 +16,12 @@ export type Job = {
   delay: number;
 };
 
+/**
+ * Main entry point of the script.
+ * Manages the deployment of batches to the most profitable server and handles target switching.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ */
 export async function main(ns: NS) {
   //log(ns, 'batcher.txt', 'Started controller\n', 'w');
   let target = getMostProfitableServer(ns, getRunnableServers(ns));
@@ -39,6 +48,12 @@ export async function main(ns: NS) {
   }
 }
 
+/**
+ * Starts worker scripts on all runnable servers and returns a map of server hostnames to process IDs.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @returns A map where keys are server hostnames and values are the process IDs of the running worker scripts.
+ */
 function spawnWorkers(ns: NS) {
   const servers = getRunnableServers(ns);
   const pidServerMap = new Map<string, number>();
@@ -59,6 +74,13 @@ function spawnWorkers(ns: NS) {
   return pidServerMap;
 }
 
+/**
+ * Determines the next target server based on profitability and total available RAM.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @param currentTarget - The currently targeted server.
+ * @returns The hostname of the next most profitable server.
+ */
 function getNextTarget(ns: NS, currentTarget: string) {
   const runnableServers = getRunnableServers(ns);
   const totalMaxRam = getTotalMaxRam(ns, runnableServers);
@@ -71,6 +93,13 @@ function getNextTarget(ns: NS, currentTarget: string) {
   return nextTarget;
 }
 
+/**
+ * Creates a batch of operations based on the hack percentage and deployer state.
+ *
+ * @param hackPercentage - The percentage of hacking to perform in the batch.
+ * @param deployer - The deployer instance responsible for planning the batch.
+ * @returns The created batch of operations.
+ */
 function createBatch(hackPercentage: number, deployer: Deployer) {
   let batch;
   if (!deployer.simulation.server.isPrepped) {
@@ -82,6 +111,13 @@ function createBatch(hackPercentage: number, deployer: Deployer) {
   return batch;
 }
 
+/**
+ * Checks if the batch of operations fits within the available RAM.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @param batch - The batch of operations to check.
+ * @returns True if the batch fits within the available RAM, otherwise false.
+ */
 function batchFits(ns: NS, batch: Batch) {
   const runnableServers = getRunnableServers(ns);
   const availableRam = getAvailableRam(ns, runnableServers);

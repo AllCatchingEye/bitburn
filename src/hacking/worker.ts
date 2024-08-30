@@ -7,6 +7,11 @@ export type Job = {
   delay: number;
 };
 
+/**
+ * Main function that runs continuously, listening for job instructions from a port.
+ *
+ * @param ns - The Netscript environment object.
+ */
 export async function main(ns: NS) {
   const port = ns.getPortHandle(ns.pid);
 

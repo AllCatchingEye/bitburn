@@ -6,12 +6,22 @@ import { getDelays } from './delays';
 import { log } from '@/logger/logger';
 import { Batch, batchHasEnoughRam, resizeBatch } from './batch';
 
+/**
+ * Handles the simulation of server hacking and growth operations.
+ */
 export class Simulation {
   ns: NS;
   baseDelay: number;
   player: Player;
   server: MockServer;
 
+  /**
+   * Constructs a Simulation instance.
+   *
+   * @param ns - The Netscript environment object.
+   * @param serverName - The hostname of the server to simulate.
+   * @param baseDelay - Base delay between operations.
+   */
   constructor(ns: NS, serverName: string, baseDelay: number) {
     this.ns = ns;
     this.baseDelay = baseDelay;
@@ -19,6 +29,11 @@ export class Simulation {
     this.server = new MockServer(ns, serverName);
   }
 
+  /**
+   * Determines the number of threads needed for a preparation batch.
+   *
+   * @returns The number of threads required for preparation.
+   */
   getPrepThreads() {
     const threads = this.server.hasMinDifficulty
       ? planThreadsGrowBatch(this.ns, this)
@@ -26,6 +41,11 @@ export class Simulation {
     return threads;
   }
 
+  /**
+   * Plans and returns a preparation batch for the server.
+   *
+   * @returns A Batch object containing the planned threads and delays.
+   */
   planPrepBatch() {
     //log(this.ns, 'batcher.txt', '===== Prep Batch =====\n', 'a');
 
@@ -43,6 +63,12 @@ export class Simulation {
     return batch;
   }
 
+  /**
+   * Plans and returns a normal hacking batch based on the hack percentage.
+   *
+   * @param hackPercentage - The percentage of the server's money to hack.
+   * @returns A Batch object containing the planned threads and delays.
+   */
   planBatch(hackPercentage: number) {
     //log(this.ns, 'batcher.txt', '===== HWGW Batch =====\n', 'a');
 
@@ -61,11 +87,21 @@ export class Simulation {
     return batch;
   }
 
+  /**
+   * Calculates the effects of a batch of threads on the server and player.
+   *
+   * @param threads - The Threads object representing the number of threads used.
+   */
   calculateEffects(threads: Threads) {
     this.calculateServerEffects(threads);
     this.calculatePlayerEffects(threads);
   }
 
+  /**
+   * Calculates the effects of a batch of threads on the server.
+   *
+   * @param threads - The Threads object representing the number of threads used.
+   */
   calculateServerEffects(threads: Threads) {
     this.calculateHackEffects(threads.hack);
     this.calculateWeakenEffects(threads.weakenHack);
@@ -76,6 +112,11 @@ export class Simulation {
     //this.server.logSecurity();
   }
 
+  /**
+   * Calculates the effects of a batch of threads on the player.
+   *
+   * @param threads - The Threads object representing the number of threads used.
+   */
   calculatePlayerEffects(threads: Threads) {
     if (this.player != undefined && this.ns.fileExists('Formulas.exe')) {
       let totalExpGain = 0;
@@ -85,6 +126,12 @@ export class Simulation {
     }
   }
 
+  /**
+   * Calculates the total experience gained by the player from a batch of threads.
+   *
+   * @param threads - The Threads object representing the number of threads used.
+   * @returns The total experience gained.
+   */
   calculateBatchExp(threads: Threads) {
     const server = this.server;
     const singleThreadExp = this.ns.formulas.hacking.hackExp(server, this.player);
@@ -98,6 +145,11 @@ export class Simulation {
     return totalExpGain;
   }
 
+  /**
+   * Calculates the effects of hack threads on the server.
+   *
+   * @param hackThreads - The number of hack threads.
+   */
   calculateHackEffects(hackThreads: number) {
     const moneyDecrease = hackThreads * this.ns.hackAnalyze(this.server.hostname);
     const secIncrease = this.ns.hackAnalyzeSecurity(hackThreads);
@@ -105,6 +157,11 @@ export class Simulation {
     this.server.changeSecurity(secIncrease);
   }
 
+  /**
+   * Calculates the effects of grow threads on the server.
+   *
+   * @param growThreads - The number of grow threads.
+   */
   calculateGrowEffects(growThreads: number) {
     if (this.ns.fileExists('Formulas.exe')) {
       this.server.money = this.ns.formulas.hacking.growAmount(this.server, this.player, growThreads);
@@ -116,6 +173,13 @@ export class Simulation {
     this.server.changeSecurity(secIncrease);
   }
 
+  /**
+   * Calculates the increase in money due to grow threads.
+   *
+   * @param threads - The number of grow threads.
+   * @param coreBonus - The core bonus multiplier (default is 1).
+   * @returns The amount of money gained.
+   */
   calculateGrowMoney(threads: number, coreBonus = 1) {
     const serverGrowth = this.ns.getServerGrowth(this.server.hostname);
     const hackingGrow = this.player.mults.hacking_grow;
@@ -132,6 +196,11 @@ export class Simulation {
     return moneyDelta;
   }
 
+  /**
+   * Calculates the effects of weaken threads on the server.
+   *
+   * @param weakenThreads - The number of weaken threads.
+   */
   calculateWeakenEffects(weakenThreads: number) {
     const secDecrease = weakenThreads * this.ns.weakenAnalyze(1);
     this.server.changeSecurity(-secDecrease);
