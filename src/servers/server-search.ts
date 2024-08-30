@@ -1,6 +1,15 @@
 import { NS } from '@ns';
 import { canHack } from '../utility/utility-functions';
 
+/**
+ * Performs a depth-first search (DFS) to scan all servers from a starting host.
+ * This function will recursively visit all servers connected to the starting host.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @param host - The starting server for the DFS scan.
+ * @param visited - An array to keep track of visited servers.
+ * @returns An array of all visited servers.
+ */
 export function DepthFirstServerScan(ns: NS, host: string, visited: string[]) {
   visited.push(host);
   const servers = ns.scan(host);
@@ -13,12 +22,27 @@ export function DepthFirstServerScan(ns: NS, host: string, visited: string[]) {
   return visited;
 }
 
+/**
+ * Retrieves a list of servers that have root access.
+ * This function starts scanning from 'home' and filters the servers that have root access.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @returns An array of server hostnames that have root access.
+ */
 export function getRunnableServers(ns: NS) {
   const servers = DepthFirstServerScan(ns, 'home', []);
   const runnableServers = servers.filter((server) => ns.hasRootAccess(server));
   return runnableServers;
 }
 
+/**
+ * Determines the most profitable server from a list of servers.
+ * The server is evaluated based on a calculated "weight," which is influenced by its money capacity and difficulty.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @param servers - An array of server hostnames to evaluate.
+ * @returns The hostname of the most profitable server.
+ */
 export function getMostProfitableServer(ns: NS, servers: string[]) {
   let bestWeight = 0;
   let bestServer = 'n00dles';
@@ -37,6 +61,14 @@ export function getMostProfitableServer(ns: NS, servers: string[]) {
   return bestServer;
 }
 
+/**
+ * Calculates a weight for a given server based on its money capacity, difficulty, and hacking requirements.
+ * The weight represents the server's profitability and is used to determine the most profitable server.
+ *
+ * @param ns - The Netscript environment object provided by the game.
+ * @param serverName - The hostname of the server to evaluate.
+ * @returns A numerical weight representing the server's profitability.
+ */
 function Weight(ns: NS, serverName: string) {
   if (!serverName) return 0;
 
